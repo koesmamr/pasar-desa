@@ -2,43 +2,54 @@
 
 Platform digital toko online dan e-commerce berbasis **BUMDes** (Badan Usaha Milik Desa) untuk memasarkan produk unggulan UMKM, pertanian, perkebunan, dan kerajinan tangan warga desa ke seluruh Indonesia sekaligus meningkatkan **PAD (Pendapatan Asli Desa)** secara otomatis dan transparan.
 
+> **💡 Multi-App Safe:** Aplikasi ini dirancang agar dapat diinstal di VPS baru maupun **berdampingan dengan aplikasi lain yang sudah ada** (seperti `warungpulsa`) tanpa bentrok port dan tanpa menimpa konfigurasi Nginx yang sudah ada.
+
 ---
 
-## ⚡ Metode Cepat: Autoinstall 1 Perintah (Rekomendasi VPS Ubuntu 24 / 22)
+## ⚡ Metode Cepat: Autoinstall 1 Perintah (VPS Ubuntu 24 / 22)
 
-Untuk menginstal **Pasar Desa Nusantara** di VPS Ubuntu 24.04 / 22.04 LTS baru, cukup login sebagai user **`root`** via SSH dan jalankan **1 baris perintah** berikut:
+Login sebagai user **`root`** via SSH dan jalankan **1 baris perintah** berikut:
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/koesmamr/pasar-desa/main/pasardesainstall.sh | bash
 ```
-*(atau bisa juga menggunakan `install.sh`):*
+
+*(Atau jika ingin langsung menentukan domain khusus untuk Pasar Desa):*
 ```bash
-curl -sSL https://raw.githubusercontent.com/koesmamr/pasar-desa/main/install.sh | bash
+DOMAIN="pasardesa-desa.id" curl -sSL https://raw.githubusercontent.com/koesmamr/pasar-desa/main/pasardesainstall.sh | bash
 ```
 
-### 🤖 Apa yang Dilakukan Script Ini Secara Otomatis?
-1. **Update Sistem**: Memperbarui paket Ubuntu dan memasang dependensi (Git, Nginx, Certbot, SQLite, build-essential).
-2. **Install Node.js 22 LTS & PM2**: Memasang runtime Node.js v22 dan PM2 Process Manager secara global.
-3. **Download Repository**: Meng-clone repository `koesmamr/pasar-desa` ke direktori `/var/www/pasar-desa`.
-4. **Install Dependensi NPM**: Memasang package `express`, `bcryptjs`, `dotenv`, dll.
-5. **Setup Konfigurasi `.env` & Database**: Menginisialisasi basis data SQLite lokal mode WAL dan akun pengelola BUMDes.
-6. **Konfigurasi Nginx Reverse Proxy**: Mengatur Nginx agar port 80 langsung me-forward request ke aplikasi Node.js (port 3000).
-7. **Jalankan Aplikasi via PM2**: Aplikasi langsung aktif, tersimpan, dan otomatis menyala kembali jika VPS di-reboot.
+---
+
+## 🛡️ Mengapa Aman dari Bentrok dengan Warung Pulsa?
+
+Script instalasi telah dibekali deteksi cerdas multi-aplikasi:
+1. **Port Internal Berbeda**:
+   - `warungpulsa` berjalan di internal Port **3000**.
+   - `pasar-desa` berjalan di internal Port **3001**.
+2. **Proses PM2 Terpisah**:
+   - Masing-masing aplikasi memiliki nama unik (`warungpulsa` & `pasar-desa`), sehingga keduanya berjalan bersamaan dan dapat dicek via `pm2 status`.
+3. **Konfigurasi Nginx Cerdas**:
+   - Jika VPS mendeteksi `warungpulsa`, script **TIDAK AKAN** menghapus konfigurasi Nginx `warungpulsa`.
+   - `warungpulsa` tetap melayani di Port 80 (`http://IP_VPS`), sedangkan `pasar-desa` otomatis disiapkan di Port 8080 (`http://IP_VPS:8080`) atau langsung di domain desa Anda.
+4. **Folder Terisolasi**:
+   - `warungpulsa` berada di `/var/www/warungpulsa`.
+   - `pasar-desa` berada di `/var/www/pasar-desa`.
 
 ---
 
 ## 🌟 Fitur Utama Platform
 
 1. **Desain Toko Bernuansa Lokal Nusantara:**
-   - Visual hangat (*earthy brown & warm cream*) sesuai kearifan lokal.
-   - Banner panorama desa, etalase produk unggulan desa, dan filter kategori interaktif (Pangan, Makanan Olahan, Pertanian, Kerajinan Tangan, Herbal).
+   - Visual hangat (*earthy brown & warm cream*) sesuai kearifan lokal desa.
+   - Banner panorama pedesaan, etalase produk unggulan desa, dan filter kategori interaktif (Pangan, Makanan Olahan, Pertanian, Kerajinan Tangan, Herbal).
 2. **Dual Mode Pemesanan & Checkout:**
-   - **Checkout WhatsApp BUMDes:** Pembeli langsung terhubung ke nomor WA pengelola BUMDes dengan format invoice rapi sekali klik.
+   - **Checkout WhatsApp BUMDes:** Pembeli langsung terhubung ke WhatsApp pengelola BUMDes dengan format invoice terstruktur.
    - **Checkout QRIS & Transfer Bank:** Menyajikan barcode QRIS otomatis dan rekening bank resmi BUMDes.
 3. **Kalkulator PAD (Pendapatan Asli Desa) Otomatis:**
-   - Setiap transaksi otomatis menghitung persentase alokasi dana untuk kas desa (misal: 5% untuk pembangunan posyandu dan fasilitas warga).
+   - Setiap transaksi otomatis menghitung persentase alokasi dana untuk kas desa (misal: 5% untuk pembangunan sarana desa).
 4. **Cerita Desa (Storytelling & Traceability):**
-   - Halaman khusus profil perajin dan kelompok tani desa untuk meningkatkan nilai jual emosional produk lokal.
+   - Halaman profil perajin dan kelompok tani desa untuk meningkatkan nilai emosional produk lokal.
 5. **Panel Pengelola BUMDes (`/admin`):**
    - Dashboard statistik omzet dan akumulasi kas PAD.
    - Manajemen produk (tambah, edit harga/stok/foto, hapus).
@@ -49,95 +60,44 @@ curl -sSL https://raw.githubusercontent.com/koesmamr/pasar-desa/main/install.sh 
 
 ## 🔐 Kredensial Login Default Panel Pengelola
 
-Setelah instalasi selesai, buka panel pengelola di browser:
-- **URL Admin:** `http://IP_VPS_ANDA/admin`
+- **URL Admin:** `http://IP_VPS_ANDA:8080/admin` *(atau `http://domain-desa.id/admin` jika pakai domain)*
 - **Username:** `admin`
 - **Password:** `admin123`
-
-*(Password dan profil dapat diubah langsung dari file `.env` atau menu Pengaturan)*
 
 ---
 
 ## 🌐 Pasang Domain & SSL HTTPS Gratis (Let's Encrypt)
 
-Setelah domain desa Anda (misal `pasardesa-sukamaju.id` atau subdomain) sudah diarahkan DNS A Record-nya ke IP VPS, jalankan perintah berikut di terminal VPS:
-
-```bash
-certbot --nginx -d pasardesa-sukamaju.id -d www.pasardesa-sukamaju.id
-```
-
-*Certbot otomatis memperbarui konfigurasi Nginx dan memperpanjang sertifikat SSL secara berkala.*
+Jika Anda ingin Pasar Desa memiliki domain tersendiri (misal: `pasardesa.id`):
+1. Arahkan DNS A-Record domain ke IP VPS Anda.
+2. Edit file virtual host Nginx:
+   ```bash
+   nano /etc/nginx/sites-available/pasar-desa
+   ```
+   Ubah `listen 8080;` menjadi `listen 80;` dan ubah `server_name _;` menjadi:
+   ```nginx
+   server_name pasardesa.id www.pasardesa.id;
+   ```
+3. Simpan dan reload Nginx:
+   ```bash
+   systemctl reload nginx
+   ```
+4. Aktifkan SSL HTTPS gratis:
+   ```bash
+   certbot --nginx -d pasardesa.id -d www.pasardesa.id
+   ```
 
 ---
 
 ## 🛠️ Perintah Pemeliharaan Server VPS
 
-Semua operasi aplikasi dapat dipantau dan dikelola dengan mudah melalui terminal:
-
 | Kebutuhan | Perintah di Terminal VPS |
 | :--- | :--- |
-| **Cek Status Server** | `pm2 status` |
-| **Lihat Log Realtime** | `pm2 logs pasar-desa` |
-| **Restart Aplikasi** | `pm2 restart pasar-desa` |
-| **Stop Aplikasi** | `pm2 stop pasar-desa` |
-| **Edit Pengaturan (.env)** | `nano /var/www/pasar-desa/.env` *(lalu jalankan `pm2 restart pasar-desa`)* |
-| **Restart Web Server Nginx** | `systemctl restart nginx` |
-| **Backup Database Manual** | `cp /var/www/pasar-desa/data/pasardesa.db /root/backup-$(date +%F).db` |
-
----
-
-## 💻 Menjalankan di Komputer Lokal (Development)
-
-Jika ingin menguji atau memodifikasi kode di laptop/PC lokal:
-
-```bash
-# 1. Clone repository
-git clone https://github.com/koesmamr/pasar-desa.git
-cd pasar-desa
-
-# 2. Install dependensi
-npm install
-
-# 3. Buat file konfigurasi
-copy .env.example .env
-
-# 4. Jalankan server lokal
-npm start
-# atau mode auto-reload dev:
-npm run dev
-```
-Akses web lokal melalui browser: [http://localhost:3000](http://localhost:3000)
-
----
-
-## 📁 Struktur Direktori Proyek
-
-```text
-pasar-desa/
-├── data/
-│   └── pasardesa.db         # Database SQLite lokal (otomatis terbuat)
-├── public/
-│   ├── css/
-│   │   └── style.css        # Desain kearifan lokal bernuansa terracotta & cream
-│   ├── js/
-│   │   ├── app.js           # Logika katalog, keranjang belanja & checkout WA
-│   │   └── admin.js         # Logika panel pengelola BUMDes & CRUD produk
-│   ├── index.html           # Halaman utama etalase Pasar Desa Nusantara
-│   └── admin.html           # Halaman panel dashboard BUMDes & PAD
-├── src/
-│   ├── db.js                # Inisialisasi SQLite (node:sqlite & better-sqlite3)
-│   └── routes/
-│       ├── api.js           # API publik (produk, kategori, order, stories)
-│       └── admin.js         # API pengelola (auth, stats, CRUD, settings)
-├── .env.example             # Template konfigurasi environment
-├── .gitignore               # Pengecualian Git
-├── ecosystem.config.js      # Konfigurasi PM2 Process Manager
-├── install.sh               # Alias skrip autoinstall VPS
-├── package.json             # Manifest dependensi project
-├── pasardesainstall.sh      # Skrip autoinstall sekali jalan untuk Ubuntu 24/22
-├── server.js                # Entry point server HTTP Express
-└── README.md                # Dokumentasi & panduan instalasi
-```
+| **Cek Status Semua Web (Warung Pulsa & Pasar Desa)** | `pm2 status` |
+| **Lihat Log Pasar Desa** | `pm2 logs pasar-desa` |
+| **Restart Pasar Desa** | `pm2 restart pasar-desa` |
+| **Edit Pengaturan (.env)** | `nano /var/www/pasar-desa/.env` *(lalu `pm2 restart pasar-desa`)* |
+| **Update Kode dari GitHub** | `cd /var/www/pasar-desa && git pull origin main && pm2 restart pasar-desa` |
 
 ---
 
