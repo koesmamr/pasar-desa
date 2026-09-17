@@ -3,33 +3,60 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const { db } = require('../db');
 
-// Dummy simple in-memory session token store (atau hash token)
+// Simple in-memory session token store (untuk fallback login manual)
 const activeTokens = new Map();
 
-// Helper generate token
 function generateToken(username) {
   const token = 'psd_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
   activeTokens.set(token, { username, createdAt: Date.now() });
   return token;
 }
 
-// Middleware Proteksi Admin
-function requireAuth(req, res, next) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader) {
-    return res.status(401).json({ success: false, message: 'Autentikasi diperlukan. Silakan login.' });
-  }
-
-  const token = authHeader.replace('Bearer ', '').trim();
-  if (!activeTokens.has(token)) {
-    return res.status(401).json({ success: false, message: 'Sesi login telah berakhir atau tidak valid.' });
-  }
-
-  req.adminUser = activeTokens.get(token);
-  next();
+// Helper Cek Superadmin
+function isSuperAdminEmail(email) {
+  if (!email) return false;
+  const clean = email.toLowerCase().trim();
+  const configuredAdmin = (process.env.ADMIN_EMAIL || 'syamsul18782@gmail.com').toLowerCase().trim();
+  return clean === configuredAdmin || clean === 'syamsul18782@gmail.com';
 }
 
-// 1. Admin Login
+// Middleware Proteksi Admin (Mendukung Sesi Google SSO & Token Manual)
+function requireAuth(req, res, next) {
+  // 1. Cek dari Cookie Google SSO (Pola Warung Pulsa)
+  const cookieHeader = req.headers.cookie || '';
+  const sessionMatch = cookieHeader.match(/session_id=([^;]+)/);
+  if (sessionMatch) {
+    const sessionId = sessionMatch[1];
+    const session = db.prepare(`
+      SELECT email FROM sessions WHERE id = ? AND expires_at > datetime('now')
+    `).get(sessionId);
+
+    if (session) {
+      const user = db.prepare('SELECT * FROM users WHERE email = ?').get(session.email);
+      if (user && (user.is_admin === 1 || isSuperAdminEmail(user.email))) {
+        req.adminUser = { username: user.email, name: user.name, role: 'admin', type: 'google' };
+        return next();
+      }
+    }
+  }
+
+  // 2. Cek dari Authorization Header (Bearer Token)
+  const authHeader = req.headers.authorization;
+  if (authHeader) {
+    const token = authHeader.replace('Bearer ', '').trim();
+    if (activeTokens.has(token)) {
+      req.adminUser = activeTokens.get(token);
+      return next();
+    }
+  }
+
+  return res.status(401).json({
+    success: false,
+    message: 'Autentikasi admin diperlukan. Silakan login menggunakan Akun Google Admin atau kredensial yang sah.'
+  });
+}
+
+// 1. Admin Login Manual (Fallback)
 router.post('/login', (req, res) => {
   try {
     const { username, password } = req.body;
@@ -65,9 +92,18 @@ router.post('/login', (req, res) => {
 });
 
 // 2. Admin Logout
-router.post('/logout', requireAuth, (req, res) => {
-  const token = req.headers.authorization.replace('Bearer ', '').trim();
-  activeTokens.delete(token);
+router.post('/logout', (req, res) => {
+  const cookieHeader = req.headers.cookie || '';
+  const sessionMatch = cookieHeader.match(/session_id=([^;]+)/);
+  if (sessionMatch) {
+    db.prepare('DELETE FROM sessions WHERE id = ?').run(sessionMatch[1]);
+  }
+  const authHeader = req.headers.authorization;
+  if (authHeader) {
+    const token = authHeader.replace('Bearer ', '').trim();
+    activeTokens.delete(token);
+  }
+  res.setHeader('Set-Cookie', 'session_id=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax');
   res.json({ success: true, message: 'Logout berhasil' });
 });
 
@@ -78,7 +114,6 @@ router.get('/stats', requireAuth, (req, res) => {
     const totalOrders = db.prepare('SELECT COUNT(*) as count FROM orders').get()?.count || 0;
     const pendingOrders = db.prepare('SELECT COUNT(*) as count FROM orders WHERE status = "pending"').get()?.count || 0;
     
-    // Hitung total omzet & total alokasi kas PAD
     const finance = db.prepare(`
       SELECT 
         COALESCE(SUM(total_amount), 0) as total_omzet,
@@ -98,7 +133,8 @@ router.get('/stats', requireAuth, (req, res) => {
         pending_orders: pendingOrders,
         total_omzet: finance?.total_omzet || 0,
         total_pad: finance?.total_pad || 0,
-        recent_orders: recentOrders
+        recent_orders: recentOrders,
+        admin_user: req.adminUser
       }
     });
   } catch (err) {
@@ -256,7 +292,7 @@ router.get('/orders', requireAuth, (req, res) => {
   }
 });
 
-// 9. Update Status Pesanan (Pending, Diproses, Dikirim, Selesai, Dibatalkan)
+// 9. Update Status Pesanan
 router.put('/orders/:id/status', requireAuth, (req, res) => {
   try {
     const { status } = req.body;
@@ -273,6 +309,8 @@ router.get('/settings', requireAuth, (req, res) => {
     const rows = db.prepare('SELECT key, value FROM settings').all();
     const config = {};
     rows.forEach(r => { config[r.key] = r.value; });
+    config.google_client_id = process.env.GOOGLE_CLIENT_ID || config.google_client_id || '727817597785-oub85kbvvsl640v7q4cak661vn5jt7kh.apps.googleusercontent.com';
+    config.admin_email = process.env.ADMIN_EMAIL || config.admin_email || 'syamsul18782@gmail.com';
     res.json({ success: true, data: config });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

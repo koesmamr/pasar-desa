@@ -27,47 +27,18 @@ try {
     rawDb.pragma('synchronous = NORMAL');
     driver = 'better-sqlite3';
   } catch (e2) {
-    console.warn('[Database] Peringatan: Driver SQLite native tidak ditemukan, menggunakan JSON Database Fallback.');
+    console.warn('[Database] Peringatan: Driver SQLite native tidak ditemukan, menggunakan JSON Fallback.');
     driver = 'json-fallback';
   }
 }
 
 console.log(`[Database] Terkoneksi menggunakan driver: ${driver} (${dbPath})`);
 
-// Wrapper Kompatibilitas Query
 class DBWrapper {
   constructor(driver, rawDb, dbPath) {
     this.driver = driver;
     this.rawDb = rawDb;
     this.dbPath = dbPath;
-    this.jsonFile = path.join(dataDir, 'pasardesa_data.json');
-    if (driver === 'json-fallback') {
-      this.initJsonStore();
-    }
-  }
-
-  initJsonStore() {
-    if (!fs.existsSync(this.jsonFile)) {
-      this.store = {
-        settings: {},
-        categories: [],
-        products: [],
-        stories: [],
-        orders: [],
-        admins: []
-      };
-      this.saveJson();
-    } else {
-      try {
-        this.store = JSON.parse(fs.readFileSync(this.jsonFile, 'utf8'));
-      } catch (e) {
-        this.store = { settings: {}, categories: [], products: [], stories: [], orders: [], admins: [] };
-      }
-    }
-  }
-
-  saveJson() {
-    fs.writeFileSync(this.jsonFile, JSON.stringify(this.store, null, 2), 'utf8');
   }
 
   exec(sql) {
@@ -77,7 +48,6 @@ class DBWrapper {
   }
 
   prepare(sql) {
-    const self = this;
     if (this.rawDb) {
       const stmt = this.rawDb.prepare(sql);
       return {
@@ -112,7 +82,6 @@ class DBWrapper {
       };
     }
 
-    // Fallback JSON simple mock
     return {
       get: () => null,
       all: () => [],
@@ -123,13 +92,27 @@ class DBWrapper {
 
 const db = new DBWrapper(driver, rawDb, dbPath);
 
-// Inisialisasi Tabel dan Data Awal
 function initDatabase() {
   if (db.rawDb) {
     db.exec(`
       CREATE TABLE IF NOT EXISTS settings (
         key TEXT PRIMARY KEY,
         value TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS users (
+        email TEXT PRIMARY KEY,
+        name TEXT,
+        phone TEXT DEFAULT '',
+        picture TEXT DEFAULT '',
+        is_admin INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS sessions (
+        id TEXT PRIMARY KEY,
+        email TEXT NOT NULL,
+        expires_at DATETIME NOT NULL
       );
 
       CREATE TABLE IF NOT EXISTS categories (
@@ -198,14 +181,12 @@ function initDatabase() {
     `);
   }
 
-  // Seed settings jika kosong
   seedDefaults();
 }
 
 function seedDefaults() {
   const bcrypt = require('bcryptjs');
 
-  // 1. Settings
   const defaultSettings = [
     { key: 'desa_name', value: process.env.DESA_NAME || 'Desa Nusantara' },
     { key: 'bumdes_name', value: process.env.BUMDES_NAME || 'BUMDes Berkah Mandiri' },
@@ -216,7 +197,8 @@ function seedDefaults() {
     { key: 'bank_account', value: process.env.BANK_ACCOUNT || '0123-01-000456-50-8' },
     { key: 'bank_holder', value: process.env.BANK_HOLDER || 'BUMDES BERKAH MANDIRI' },
     { key: 'store_address', value: 'Jl. Raya Desa No. 12, Kantor BUMDes Berkah Mandiri' },
-    { key: 'announcement', value: '🎉 Selamat Datang di Pasar Desa Nusantara! Dapatkan promo gratis ongkir khusus produk tani & kerajinan lokal.' }
+    { key: 'google_client_id', value: process.env.GOOGLE_CLIENT_ID || '727817597785-oub85kbvvsl640v7q4cak661vn5jt7kh.apps.googleusercontent.com' },
+    { key: 'admin_email', value: process.env.ADMIN_EMAIL || 'syamsul18782@gmail.com' }
   ];
 
   for (const s of defaultSettings) {
@@ -255,7 +237,7 @@ function seedDefaults() {
       stock: 12,
       unit: 'lembar',
       image_url: 'https://images.unsplash.com/photo-1606744824163-985d376605aa?w=600&auto=format&fit=crop&q=80',
-      description: 'Kain tenun ikat tradisional dengan pewarna alami akar kayu dan daun tanaman lokal. Ditenun rapi dengan ketelitian tinggi oleh kelompok perajin tenun perempuan desa.',
+      description: 'Kain tenun ikat tradisional dengan pewarna alami akar kayu dan daun tanaman lokal. Ditenun rapi oleh kelompok perajin tenun perempuan desa.',
       village_origin: 'Dusun Sukarasa',
       maker_name: 'Kelompok Tenun Ibu Siti',
       is_featured: 1
@@ -269,7 +251,7 @@ function seedDefaults() {
       stock: 45,
       unit: 'pack 250gr',
       image_url: 'https://images.unsplash.com/photo-1559056199-641a0ac8b55e?w=600&auto=format&fit=crop&q=80',
-      description: 'Biji kopi robusta pilihan dari lereng bukit berketinggian 900 mdpl. Dipetik merah sempurna, disangrai medium-dark secara tradisional menghasilkan aroma cokelat karamel yang khas.',
+      description: 'Biji kopi robusta pilihan dari lereng bukit berketinggian 900 mdpl. Dipetik merah sempurna, disangrai medium-dark secara tradisional.',
       village_origin: 'Lereng Bukit Makmur',
       maker_name: 'Kelompok Tani Kopi Lestari',
       is_featured: 1
@@ -283,7 +265,7 @@ function seedDefaults() {
       stock: 20,
       unit: 'set',
       image_url: 'https://images.unsplash.com/photo-1590402494682-cd3fb53b1f70?w=600&auto=format&fit=crop&q=80',
-      description: 'Bakul dan wadah serbaguna dari bambu apus pilihan yang diolah anti-jamur. Kuat, ramah lingkungan, dan mempercantik interior meja makan Anda.',
+      description: 'Bakul dan wadah serbaguna dari bambu apus pilihan yang diolah anti-jamur. Kuat dan ramah lingkungan.',
       village_origin: 'Dusun Bambu Indah',
       maker_name: 'Sanggar Anyam Pak Karyo',
       is_featured: 1
@@ -297,7 +279,7 @@ function seedDefaults() {
       stock: 60,
       unit: 'kg',
       image_url: 'https://images.unsplash.com/photo-1587393855524-087f83d95bc9?w=600&auto=format&fit=crop&q=80',
-      description: 'Gula kelapa murni tanpa campuran obat kimia dan tanpa bahan pengawet. Dimasak perlahan di atas tungku kayu bakar, menghasilkan aroma harum legit alami.',
+      description: 'Gula kelapa murni tanpa campuran obat kimia dan tanpa bahan pengawet. Dimasak perlahan di atas tungku kayu bakar.',
       village_origin: 'Dusun Kelapa Rindang',
       maker_name: 'Paguyuban Penderes Nira Berkah',
       is_featured: 1
@@ -311,7 +293,7 @@ function seedDefaults() {
       stock: 80,
       unit: 'karung 5kg',
       image_url: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=600&auto=format&fit=crop&q=80',
-      description: 'Beras pulen aromatik pandan alami tanpa pemutih dan tanpa pestisida kimia. Diairi dari sumber mata air pegunungan yang jernih dan segar.',
+      description: 'Beras pulen aromatik pandan alami tanpa pemutih dan tanpa pestisida kimia.',
       village_origin: 'Subak Sawah Luhur',
       maker_name: 'Gabungan Kelompok Tani Subur',
       is_featured: 1
@@ -325,7 +307,7 @@ function seedDefaults() {
       stock: 30,
       unit: 'botol 250ml',
       image_url: 'https://images.unsplash.com/photo-1526947425960-945c6e72858f?w=600&auto=format&fit=crop&q=80',
-      description: 'VCO diekstraksi dingin (cold-pressed) dari kelapa segar desa tanpa pemanasan. Bening jernih, kaya asam laurat baik untuk imunitas tubuh dan perawatan kulit.',
+      description: 'VCO diekstraksi dingin (cold-pressed) dari kelapa segar desa tanpa pemanasan. Bening jernih dan higienis.',
       village_origin: 'Dusun Pesisir Sejahtera',
       maker_name: 'BUMDes Sentra Kelapa',
       is_featured: 1
@@ -339,7 +321,7 @@ function seedDefaults() {
       stock: 25,
       unit: 'botol 350ml',
       image_url: 'https://images.unsplash.com/photo-1587049352846-4a222e784d38?w=600&auto=format&fit=crop&q=80',
-      description: 'Madu murni hasil panen lestari lebah liar hutan desa. Rasa manis sedikit asam segar alami dengan kandungan enzim aktif yang tinggi untuk kesehatan.',
+      description: 'Madu murni hasil panen lestari lebah liar hutan desa.',
       village_origin: 'Kawasan Hutan Desa Lestari',
       maker_name: 'Komunitas Pemburu Madu Rimba',
       is_featured: 1
@@ -353,7 +335,7 @@ function seedDefaults() {
       stock: 100,
       unit: 'bungkus 200gr',
       image_url: 'https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=600&auto=format&fit=crop&q=80',
-      description: 'Camilan keripik singkong renyah dengan taburan bumbu rempah tradisional khas desa. Tidak berminyak, gurih dan bikin ketagihan.',
+      description: 'Camilan keripik singkong renyah dengan taburan bumbu rempah tradisional khas desa.',
       village_origin: 'Sentra UMKM Krajan',
       maker_name: 'KWT (Kelompok Wanita Tani) Mandiri',
       is_featured: 1
@@ -372,7 +354,7 @@ function seedDefaults() {
     }
   }
 
-  // 4. Cerita Desa (Storytelling)
+  // 4. Cerita Desa
   const defaultStories = [
     {
       title: 'Helai Demi Helai Warisan Leluhur: Kisah Ibu Aminah Penenun Ikat',
@@ -380,7 +362,7 @@ function seedDefaults() {
       author_role: 'Ketua Kelompok Penenun Desa',
       village: 'Dusun Sukarasa',
       excerpt: 'Mengenal proses pembuatan kain tenun ikat yang membutuhkan waktu 3 pekan penuh dengan pewarna dari alam.',
-      content: 'Setiap corak tenun ikat menyimpan filosofi kesabaran dan harmoni manusia dengan alam. Dengan membeli kain tenun ini, Anda langsung mendukung 24 ibu rumah tangga di desa kami untuk tetap mandiri dan melestarikan budaya bangsa.',
+      content: 'Setiap corak tenun ikat menyimpan filosofi kesabaran dan harmoni manusia dengan alam.',
       image_url: 'https://images.unsplash.com/photo-1606744824163-985d376605aa?w=600&auto=format&fit=crop&q=80',
       read_time: '3 menit baca'
     },
@@ -390,7 +372,7 @@ function seedDefaults() {
       author_role: 'Petani Kopi BUMDes',
       village: 'Lereng Bukit Makmur',
       excerpt: 'Komitmen petani menolak pupuk kimia demi menghasilkan biji kopi organik murni berkualitas premium.',
-      content: 'Dulu kopi kami hanya dibeli tengkulak dengan harga murah. Sejak adanya Pasar Desa dan BUMDes, kami bisa menjual langsung ke pembeli kota dan sebagian laba disisihkan untuk kas pembangunan desa.',
+      content: 'Dulu kopi kami hanya dibeli tengkulak dengan harga murah. Sejak adanya Pasar Desa dan BUMDes, kami bisa menjual langsung ke pembeli kota.',
       image_url: 'https://images.unsplash.com/photo-1559056199-641a0ac8b55e?w=600&auto=format&fit=crop&q=80',
       read_time: '4 menit baca'
     }
@@ -416,11 +398,9 @@ function seedDefaults() {
       INSERT INTO admins (username, password_hash, full_name, role)
       VALUES (?, ?, ?, 'superadmin')
     `).run(adminUser, hash, 'Administrator BUMDes');
-    console.log(`[Admin] Akun admin default dibuat: ${adminUser} / ${adminPass}`);
   }
 }
 
-// Jalankan inisialisasi saat load
 initDatabase();
 
 module.exports = {

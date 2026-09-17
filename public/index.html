@@ -9,6 +9,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Google Identity Services (Google SSO) -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <!-- Stylesheet -->
   <link rel="stylesheet" href="/css/style.css">
 </head>
@@ -21,9 +23,10 @@
         <span>🌾 Toko Resmi <strong class="conf-bumdes-name">BUMDes Berkah Mandiri</strong> - <span class="conf-desa-name">Desa Nusantara</span></span>
         <span class="badge-pad">PAD Desa Terintegrasi</span>
       </div>
-      <div class="header-top-right">
-        <span>📞 Bantuan: <strong class="conf-wa">BUMDes Center</strong></span>
-        <a href="/admin" style="color: #FFE6CC; font-weight: 600;">🔐 Login Pengelola BUMDes</a>
+      <div class="header-top-right" id="topAuthArea">
+        <a href="/admin" style="color: #FFE6CC; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+          <span>🔐</span> <span>Portal Admin & Google SSO</span>
+        </a>
       </div>
     </div>
   </div>
@@ -181,7 +184,7 @@
           <li><a href="#beranda">Hubungi Kami</a></li>
           <li><a href="#faq">FAQ</a></li>
           <li><a href="#pengiriman">Pengiriman</a></li>
-          <li><a href="/admin">Portal Pengelola</a></li>
+          <li><a href="/admin">Portal Pengelola & Admin</a></li>
         </ul>
       </div>
 
@@ -272,7 +275,7 @@
           </div>
           <div class="form-group">
             <label class="form-label">Catatan Tambahan (Opsional)</label>
-            <input type="text" id="orderNotes" class="form-control" placeholder="Contoh: Titipkan di satpam / packing kayu">
+            <input type="text" id="orderNotes" class="form-control" placeholder="Contoh: Titipkan di pos satpam / packing kayu">
           </div>
           <button type="submit" class="btn-primary" style="width: 100%; padding: 13px; font-size: 15px; margin-top: 10px;">
             Kirim & Proses Pesanan Sekarang
@@ -291,9 +294,7 @@
         <h3 style="font-size: 16px;">Detail Pembayaran Pesanan</h3>
         <button onclick="closeInvoiceModal()" style="background: none; color: #FFF; font-size: 22px;">&times;</button>
       </div>
-      <div class="modal-body" id="invoiceModalBody">
-        <!-- Diisi secara dinamis oleh app.js -->
-      </div>
+      <div class="modal-body" id="invoiceModalBody"></div>
     </div>
   </div>
 

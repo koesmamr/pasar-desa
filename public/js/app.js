@@ -1,5 +1,6 @@
 ﻿// State Manajemen Aplikasi
 let appConfig = {};
+let currentUser = null;
 let currentCategory = 'semua';
 let searchQuery = '';
 let cart = JSON.parse(localStorage.getItem('pasardesa_cart') || '[]');
@@ -13,9 +14,42 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function initApp() {
   await loadConfig();
+  await checkUserAuth();
   await loadCategories();
   await loadProducts();
   await loadStories();
+}
+
+// Cek Pengguna Aktif (Google SSO)
+async function checkUserAuth() {
+  try {
+    const res = await fetch('/api/auth/me');
+    const data = await res.json();
+    if (data.success && data.loggedIn && data.user) {
+      currentUser = data.user;
+      const topAuth = document.getElementById('topAuthArea');
+      if (topAuth) {
+        topAuth.innerHTML = `
+          <div style="display:flex; align-items:center; gap:8px; font-size:12px;">
+            ${currentUser.picture ? `<img src="${currentUser.picture}" style="width:22px; height:22px; border-radius:50%;">` : '<span>👤</span>'}
+            <span>Hai, <strong>${currentUser.name}</strong></span>
+            ${currentUser.is_admin ? '<a href="/admin" style="background:#C85A32; color:#FFF; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:bold;">Panel Admin</a>' : ''}
+            <button onclick="userLogout()" style="background:none; color:#FFCDD2; font-size:11px; text-decoration:underline;">Keluar</button>
+          </div>
+        `;
+      }
+      // Isi otomatis form checkout jika kosong
+      const nameInput = document.getElementById('orderName');
+      if (nameInput && !nameInput.value) nameInput.value = currentUser.name;
+    }
+  } catch (e) {
+    console.warn('Gagal cek auth me:', e);
+  }
+}
+
+async function userLogout() {
+  await fetch('/api/logout', { method: 'POST' });
+  window.location.reload();
 }
 
 // 1. Ambil Konfigurasi Desa & BUMDes
@@ -39,7 +73,6 @@ function applyConfigToDOM() {
   const padPercent = appConfig.pad_percentage || '5';
   const wa = appConfig.whatsapp_number || '6281234567890';
 
-  // Update teks di DOM
   document.querySelectorAll('.conf-desa-name').forEach(el => el.textContent = desaName);
   document.querySelectorAll('.conf-bumdes-name').forEach(el => el.textContent = bumdesName);
   document.querySelectorAll('.conf-tagline').forEach(el => el.textContent = tagline);
@@ -130,7 +163,6 @@ function renderProducts(products) {
 
   let html = '';
   products.forEach(p => {
-    const padRupiah = Math.round((p.price * parseFloat(padPercent)) / 100);
     html += `
       <div class="product-card">
         <div class="product-thumb">
@@ -192,7 +224,6 @@ async function loadStories() {
   }
 }
 
-// Filter Kategori
 function filterCategory(slug, btn) {
   currentCategory = slug;
   document.querySelectorAll('.category-pill').forEach(el => el.classList.remove('active'));
@@ -200,7 +231,6 @@ function filterCategory(slug, btn) {
   loadProducts();
 }
 
-// Event Listeners
 function setupEventListeners() {
   const searchInput = document.getElementById('searchInput');
   if (searchInput) {
@@ -214,23 +244,16 @@ function setupEventListeners() {
     });
   }
 
-  // Tombol Buka Keranjang
   const cartBtn = document.getElementById('openCartBtn');
-  if (cartBtn) {
-    cartBtn.addEventListener('click', toggleCartDrawer);
-  }
+  if (cartBtn) cartBtn.addEventListener('click', toggleCartDrawer);
 
-  // Tombol Tutup Keranjang
   const closeCartBtn = document.getElementById('closeCartBtn');
   const cartOverlay = document.getElementById('cartOverlay');
   if (closeCartBtn) closeCartBtn.addEventListener('click', toggleCartDrawer);
   if (cartOverlay) cartOverlay.addEventListener('click', toggleCartDrawer);
 
-  // Form Checkout Submit
   const checkoutForm = document.getElementById('checkoutForm');
-  if (checkoutForm) {
-    checkoutForm.addEventListener('submit', handleCheckoutSubmit);
-  }
+  if (checkoutForm) checkoutForm.addEventListener('submit', handleCheckoutSubmit);
 }
 
 // ==========================================================================
@@ -241,14 +264,7 @@ function addToCart(id, name, price, imageUrl, village) {
   if (existing) {
     existing.qty += 1;
   } else {
-    cart.push({
-      id,
-      name,
-      price: Number(price),
-      imageUrl,
-      village,
-      qty: 1
-    });
+    cart.push({ id, name, price: Number(price), imageUrl, village, qty: 1 });
   }
   saveCart();
   updateCartUI();
@@ -345,7 +361,6 @@ function updateCartUI() {
   if (padEl) padEl.textContent = `Rp ${padAmount.toLocaleString('id-ID')}`;
 }
 
-// Beli Langsung 1 Item via WhatsApp
 function quickBuyWhatsApp(id, name, price) {
   const wa = (appConfig.whatsapp_number || '6281234567890').replace(/\D/g, '');
   const bumdesName = appConfig.bumdes_name || 'BUMDes Berkah Mandiri';
@@ -353,13 +368,12 @@ function quickBuyWhatsApp(id, name, price) {
   window.open(`https://wa.me/${wa}?text=${encodeURIComponent(text)}`, '_blank');
 }
 
-// Buka Modal Formulir Checkout
 function openCheckoutModal() {
   if (cart.length === 0) {
     showToast('Keranjang Anda masih kosong!');
     return;
   }
-  toggleCartDrawer(); // Tutup drawer
+  toggleCartDrawer();
   const modal = document.getElementById('checkoutModal');
   if (modal) modal.classList.add('active');
 }
@@ -369,7 +383,6 @@ function closeCheckoutModal() {
   if (modal) modal.classList.remove('active');
 }
 
-// Submit Pesanan
 async function handleCheckoutSubmit(e) {
   e.preventDefault();
 
@@ -404,17 +417,14 @@ async function handleCheckoutSubmit(e) {
 
     const result = await res.json();
     if (result.success) {
-      // Kosongkan keranjang
       cart = [];
       saveCart();
       updateCartUI();
       closeCheckoutModal();
 
       if (payment === 'wa') {
-        // Buka tautan WhatsApp
         window.open(result.data.whatsapp_link, '_blank');
       } else {
-        // Tampilkan Modal Invoice / QRIS
         showInvoiceModal(result.data, payment);
       }
     } else {
@@ -425,7 +435,6 @@ async function handleCheckoutSubmit(e) {
   }
 }
 
-// Tampilkan Invoice / QRIS Modal
 function showInvoiceModal(orderData, paymentMethod) {
   const modal = document.getElementById('invoiceModal');
   const body = document.getElementById('invoiceModalBody');
@@ -487,7 +496,6 @@ function closeInvoiceModal() {
   if (modal) modal.classList.remove('active');
 }
 
-// Toast Notifikasi
 function showToast(msg) {
   let toast = document.getElementById('appToast');
   if (!toast) {

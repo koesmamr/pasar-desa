@@ -1,20 +1,39 @@
 ﻿let authToken = localStorage.getItem('pasardesa_admin_token') || '';
+let currentUserProfile = null;
 let currentTab = 'dashboard';
 let categoriesCache = [];
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  setupEventListeners();
+  await checkActiveSession();
+});
+
+// Cek sesi aktif saat halaman dimuat (Cookie Google SSO atau Bearer Token)
+async function checkActiveSession() {
+  try {
+    const res = await fetch('/api/auth/me');
+    const data = await res.json();
+    if (data.success && data.loggedIn && data.user && data.user.is_admin) {
+      currentUserProfile = data.user;
+      showAdminPanel();
+      return;
+    }
+  } catch (e) {
+    console.warn('Gagal memeriksa sesi Google SSO:', e);
+  }
+
+  // Fallback: cek local token manual
   if (authToken) {
     showAdminPanel();
   } else {
     showLoginScreen();
   }
-  setupEventListeners();
-});
+}
 
 function setupEventListeners() {
   const loginForm = document.getElementById('loginForm');
   if (loginForm) {
-    loginForm.addEventListener('submit', handleLogin);
+    loginForm.addEventListener('submit', handleManualLogin);
   }
 
   const productForm = document.getElementById('productForm');
@@ -28,14 +47,32 @@ function setupEventListeners() {
   }
 }
 
-function getAuthHeaders() {
-  return {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${authToken}`
-  };
+// Callback Google SSO (Adopsi Pola Warung Pulsa)
+async function handleGoogleLoginResponse(response) {
+  try {
+    const res = await fetch('/api/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ credential: response.credential })
+    });
+    const data = await res.json();
+    if (data.success) {
+      if (data.user && data.user.is_admin) {
+        currentUserProfile = data.user;
+        showAdminPanel();
+      } else {
+        alert(`Akun Google (${data.user.email}) berhasil diverifikasi, namun akun ini bukan Administrator BUMDes Pasar Desa.`);
+      }
+    } else {
+      alert('Gagal Login dengan Google: ' + (data.message || 'Token tidak valid'));
+    }
+  } catch (err) {
+    alert('Terjadi kesalahan koneksi login Google SSO');
+  }
 }
 
-async function handleLogin(e) {
+// Login Manual (Fallback)
+async function handleManualLogin(e) {
   e.preventDefault();
   const username = document.getElementById('loginUsername').value.trim();
   const password = document.getElementById('loginPassword').value.trim();
@@ -50,23 +87,32 @@ async function handleLogin(e) {
     if (data.success) {
       authToken = data.data.token;
       localStorage.setItem('pasardesa_admin_token', authToken);
+      currentUserProfile = { name: data.data.full_name || 'Admin BUMDes' };
       showAdminPanel();
     } else {
       alert('Login Gagal: ' + data.message);
     }
   } catch (err) {
-    alert('Terjadi kesalahan koneksi login');
+    alert('Terjadi kesalahan koneksi login manual');
   }
 }
 
+function getAuthHeaders() {
+  const headers = { 'Content-Type': 'application/json' };
+  if (authToken) {
+    headers['Authorization'] = `Bearer ${authToken}`;
+  }
+  return headers;
+}
+
 function adminLogout() {
-  fetch('/api/admin/logout', {
-    method: 'POST',
-    headers: getAuthHeaders()
-  }).finally(() => {
-    authToken = '';
-    localStorage.removeItem('pasardesa_admin_token');
-    showLoginScreen();
+  fetch('/api/logout', { method: 'POST' }).finally(() => {
+    fetch('/api/admin/logout', { method: 'POST', headers: getAuthHeaders() }).finally(() => {
+      authToken = '';
+      currentUserProfile = null;
+      localStorage.removeItem('pasardesa_admin_token');
+      showLoginScreen();
+    });
   });
 }
 
@@ -78,6 +124,16 @@ function showLoginScreen() {
 function showAdminPanel() {
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('adminPanel').style.display = 'flex';
+
+  // Tampilkan Avatar & Profil di Topbar
+  const profileContainer = document.getElementById('adminProfileHeader');
+  if (profileContainer && currentUserProfile) {
+    profileContainer.innerHTML = `
+      ${currentUserProfile.picture ? `<img src="${currentUserProfile.picture}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;">` : '<span>👤</span>'}
+      <span>${currentUserProfile.name || 'Pengelola BUMDes'}</span>
+    `;
+  }
+
   loadCategories();
   loadStats();
 }
@@ -96,7 +152,7 @@ function switchAdminTab(tab, el) {
     dashboard: 'Dashboard & Ringkasan PAD',
     products: 'Kelola Katalog Produk Desa',
     orders: 'Daftar Pesanan Masuk',
-    settings: 'Pengaturan Profil Desa & BUMDes'
+    settings: 'Pengaturan Profil Desa, BUMDes & Google SSO'
   };
   document.getElementById('adminPageTitle').textContent = titles[tab] || 'Panel Pengelola';
 
@@ -119,7 +175,6 @@ async function loadStats() {
     document.getElementById('statOrders').textContent = s.total_orders;
     document.getElementById('statProducts').textContent = s.total_products;
 
-    // Recent orders table
     const tbody = document.getElementById('recentOrdersBody');
     if (s.recent_orders && s.recent_orders.length > 0) {
       tbody.innerHTML = s.recent_orders.map(o => `
@@ -328,7 +383,7 @@ async function changeOrderStatus(id, newStatus) {
   }
 }
 
-// 4. Settings Management (Whitelabel)
+// 4. Settings Management (Whitelabel & Google SSO)
 async function loadSettings() {
   try {
     const res = await fetch('/api/admin/settings', { headers: getAuthHeaders() });
@@ -339,6 +394,8 @@ async function loadSettings() {
     document.getElementById('setDesaName').value = c.desa_name || '';
     document.getElementById('setBumdesName').value = c.bumdes_name || '';
     document.getElementById('setTagline').value = c.store_tagline || '';
+    document.getElementById('setAdminEmail').value = c.admin_email || 'syamsul18782@gmail.com';
+    document.getElementById('setGoogleClientId').value = c.google_client_id || '727817597785-oub85kbvvsl640v7q4cak661vn5jt7kh.apps.googleusercontent.com';
     document.getElementById('setWa').value = c.whatsapp_number || '';
     document.getElementById('setPadPercent').value = c.pad_percentage || '5';
     document.getElementById('setBankName').value = c.bank_name || '';
@@ -358,6 +415,8 @@ async function handleSettingsSubmit(e) {
     desa_name: document.getElementById('setDesaName').value.trim(),
     bumdes_name: document.getElementById('setBumdesName').value.trim(),
     store_tagline: document.getElementById('setTagline').value.trim(),
+    admin_email: document.getElementById('setAdminEmail').value.trim(),
+    google_client_id: document.getElementById('setGoogleClientId').value.trim(),
     whatsapp_number: document.getElementById('setWa').value.trim(),
     pad_percentage: document.getElementById('setPadPercent').value.trim(),
     bank_name: document.getElementById('setBankName').value.trim(),
@@ -373,7 +432,7 @@ async function handleSettingsSubmit(e) {
     });
     const data = await res.json();
     if (data.success) {
-      alert('Pengaturan desa berhasil disimpan!');
+      alert('Pengaturan desa & Google SSO berhasil disimpan!');
       const sb = document.getElementById('adminSidebarBumdes');
       if (sb) sb.textContent = payload.bumdes_name;
     } else {

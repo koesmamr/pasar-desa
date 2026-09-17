@@ -1,6 +1,159 @@
 ﻿const express = require('express');
 const router = express.Router();
+const crypto = require('crypto');
 const { db } = require('../db');
+
+// Helper Cek Hak Akses Superadmin / Admin BUMDes
+function isSuperAdmin(userOrEmail) {
+  if (!userOrEmail) return false;
+  if (typeof userOrEmail === 'object') {
+    if (userOrEmail.is_admin === 1 || userOrEmail.is_admin === '1' || userOrEmail.is_admin === true) {
+      return true;
+    }
+  }
+  const email = (typeof userOrEmail === 'string' ? userOrEmail : (userOrEmail.email || '')).toLowerCase().trim();
+  const configuredAdmin = (process.env.ADMIN_EMAIL || 'syamsul18782@gmail.com').toLowerCase().trim();
+  return email === configuredAdmin || email === 'syamsul18782@gmail.com';
+}
+
+// Helper Ambil Pengguna dari Session Cookie
+function getCurrentUser(req) {
+  const cookieHeader = req.headers.cookie || '';
+  const match = cookieHeader.match(/session_id=([^;]+)/);
+  if (!match) return null;
+
+  const sessionId = match[1];
+  const session = db.prepare(`
+    SELECT email FROM sessions WHERE id = ? AND expires_at > datetime('now')
+  `).get(sessionId);
+
+  if (!session) return null;
+
+  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(session.email);
+  if (user) {
+    user.is_superadmin = isSuperAdmin(user);
+  }
+  return user;
+}
+
+// ==============================================================================
+// 1. GOOGLE SSO AUTHENTICATION (Adopsi Pola Warung Pulsa)
+// ==============================================================================
+
+// POST /api/auth - Verifikasi Google ID Token
+router.post('/auth', async (req, res) => {
+  try {
+    const { credential } = req.body;
+    if (!credential) {
+      return res.status(400).json({ success: false, message: 'Google Credential Token wajib disertakan' });
+    }
+
+    // Verifikasi Token ke Google OAuth2 API
+    const googleRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${credential}`);
+    if (!googleRes.ok) {
+      return res.status(401).json({ success: false, message: 'Token Google tidak valid atau telah kedaluwarsa' });
+    }
+
+    const payload = await googleRes.json();
+    const googleClientId = process.env.GOOGLE_CLIENT_ID || '727817597785-oub85kbvvsl640v7q4cak661vn5jt7kh.apps.googleusercontent.com';
+
+    // Validasi Audience Client ID
+    if (payload.aud !== googleClientId) {
+      console.warn(`[Google SSO] Client ID mismatch: aud=${payload.aud}, expected=${googleClientId}`);
+      // Lanjutkan jika dalam mode toleransi atau tolak jika tidak match
+      if (process.env.NODE_ENV === 'production' && payload.aud !== googleClientId) {
+        return res.status(400).json({ success: false, message: 'Invalid Client ID Google' });
+      }
+    }
+
+    const email = (payload.email || '').toLowerCase().trim();
+    const name = payload.name || 'Pengguna Desa';
+    const picture = payload.picture || '';
+    const isAdmin = isSuperAdmin(email) ? 1 : 0;
+
+    // Simpan atau Perbarui Data Pengguna di Database
+    let user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+    if (!user) {
+      db.prepare(`
+        INSERT INTO users (email, name, picture, is_admin)
+        VALUES (?, ?, ?, ?)
+      `).run(email, name, picture, isAdmin);
+      console.log(`[Google SSO] Pengguna baru terdaftar: ${email} (Admin: ${isAdmin})`);
+    } else {
+      const updatedAdmin = isAdmin || user.is_admin ? 1 : 0;
+      db.prepare(`
+        UPDATE users SET name = ?, picture = ?, is_admin = ? WHERE email = ?
+      `).run(name, picture, updatedAdmin, email);
+    }
+
+    // Buat Session Baru (Berlaku 7 Hari)
+    const newSessionId = crypto.randomUUID ? crypto.randomUUID() : (Date.now() + '-' + Math.random().toString(36).substring(2));
+    db.prepare(`
+      INSERT INTO sessions (id, email, expires_at)
+      VALUES (?, ?, datetime('now', '+7 days'))
+    `).run(newSessionId, email);
+
+    // Set HTTP-Only Cookie
+    res.setHeader('Set-Cookie', `session_id=${newSessionId}; HttpOnly; Path=/; Max-Age=604800; SameSite=Lax`);
+
+    return res.json({
+      success: true,
+      message: 'Login Google berhasil',
+      user: {
+        email,
+        name,
+        picture,
+        is_admin: isAdmin === 1
+      }
+    });
+
+  } catch (err) {
+    console.error('[Google SSO Error]', err);
+    return res.status(500).json({ success: false, message: 'Gagal memproses autentikasi Google: ' + err.message });
+  }
+});
+
+// GET /api/auth/me - Cek Sesi Pengguna Aktif
+router.get('/auth/me', (req, res) => {
+  try {
+    const user = getCurrentUser(req);
+    if (!user) {
+      return res.json({ success: true, loggedIn: false, user: null });
+    }
+    return res.json({
+      success: true,
+      loggedIn: true,
+      user: {
+        email: user.email,
+        name: user.name,
+        picture: user.picture,
+        phone: user.phone,
+        is_admin: user.is_admin === 1 || user.is_superadmin
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/logout - Keluar Akun
+router.post('/logout', (req, res) => {
+  try {
+    const cookieHeader = req.headers.cookie || '';
+    const match = cookieHeader.match(/session_id=([^;]+)/);
+    if (match) {
+      db.prepare('DELETE FROM sessions WHERE id = ?').run(match[1]);
+    }
+    res.setHeader('Set-Cookie', 'session_id=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax');
+    return res.json({ success: true, message: 'Berhasil keluar' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ==============================================================================
+// 2. PUBLIC STORE CONFIG & CATALOG ROUTES
+// ==============================================================================
 
 // Ambil Pengaturan Publik Toko & Desa
 router.get('/config', (req, res) => {
@@ -8,6 +161,7 @@ router.get('/config', (req, res) => {
     const rows = db.prepare('SELECT key, value FROM settings').all();
     const config = {};
     rows.forEach(r => { config[r.key] = r.value; });
+    config.google_client_id = process.env.GOOGLE_CLIENT_ID || config.google_client_id || '727817597785-oub85kbvvsl640v7q4cak661vn5jt7kh.apps.googleusercontent.com';
     res.json({ success: true, data: config });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -106,7 +260,6 @@ router.post('/orders', (req, res) => {
       return res.status(400).json({ success: false, message: 'Data pesanan belum lengkap!' });
     }
 
-    // Hitung total belanja
     let total_amount = 0;
     const validatedItems = [];
 
@@ -130,12 +283,10 @@ router.post('/orders', (req, res) => {
       return res.status(400).json({ success: false, message: 'Item pesanan tidak valid' });
     }
 
-    // Ambil persentase PAD dari settings
     const padRow = db.prepare('SELECT value FROM settings WHERE key = "pad_percentage"').get();
     const padPercent = parseFloat(padRow?.value || '5');
     const pad_amount = Math.round((total_amount * padPercent) / 100);
 
-    // Generate kode pesanan acak: PSD-2026-XXXX
     const randomSuffix = Math.floor(1000 + Math.random() * 9000);
     const order_code = `PSD-${Date.now().toString().slice(-4)}${randomSuffix}`;
 
@@ -159,7 +310,6 @@ router.post('/orders', (req, res) => {
       notes || ''
     );
 
-    // Ambil nomor WA BUMDes
     const waRow = db.prepare('SELECT value FROM settings WHERE key = "whatsapp_number"').get();
     const bumdesRow = db.prepare('SELECT value FROM settings WHERE key = "bumdes_name"').get();
     const desaRow = db.prepare('SELECT value FROM settings WHERE key = "desa_name"').get();
@@ -168,7 +318,6 @@ router.post('/orders', (req, res) => {
     const bumdesName = bumdesRow?.value || 'BUMDes Pasar Desa';
     const desaName = desaRow?.value || 'Desa Nusantara';
 
-    // Buat template teks WhatsApp
     let waText = `Halo Admin *${bumdesName}* (${desaName}),\nSaya ingin memesan produk Pasar Desa:\n\n`;
     waText += `📋 *Invoice:* #${order_code}\n`;
     waText += `👤 *Nama:* ${customer_name}\n`;

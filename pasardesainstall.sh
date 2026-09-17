@@ -1,8 +1,8 @@
 ﻿#!/usr/bin/env bash
 # ==============================================================================
-# AUTOINSTALL SCRIPT: PASAR DESA NUSANTARA (MULTI-APP SAFE)
+# AUTOINSTALL SCRIPT: PASAR DESA NUSANTARA (GOOGLE SSO & MULTI-APP READY)
 # Target OS: Ubuntu 24.04 LTS / Ubuntu 22.04 LTS
-# Aman dipasang berdampingan dengan aplikasi lain (misal: warungpulsa)
+# Mengadopsi Pola Google SSO & Kompatibel Penuh Berdampingan dengan Warung Pulsa
 # ==============================================================================
 
 set -e
@@ -20,6 +20,7 @@ echo -e "${CYAN}"
 echo "=================================================================="
 echo "    🌾 AUTOINSTALL PASAR DESA NUSANTARA - UBUNTU 24 READY 🌾     "
 echo "        Platform Toko BUMDes & Akselerator PAD Desa Digital       "
+echo "              Terintegrasi Resmi dengan Google SSO                "
 echo "=================================================================="
 echo -e "${NC}"
 
@@ -35,13 +36,13 @@ REPO_URL="https://github.com/koesmamr/pasar-desa.git"
 BRANCH="main"
 APP_PORT=3001
 
-# 2. Deteksi Apakah Ada Aplikasi Lain yang Sudah Berjalan (misal Warung Pulsa)
-echo -e "${YELLOW}==> Memeriksa lingkungan server (Cek aplikasi lain)...${NC}"
+# 2. Deteksi Lingkungan VPS (Cek Warung Pulsa)
+echo -e "${YELLOW}==> Memeriksa lingkungan server...${NC}"
 HAS_WARUNGPULSA=false
 if [ -d "/var/www/warungpulsa" ] || [ -f "/etc/nginx/sites-available/warungpulsa" ]; then
     HAS_WARUNGPULSA=true
-    echo -e "${GREEN}[INFO TERDETEKSI] Aplikasi Warung Pulsa ditemukan di VPS ini.${NC}"
-    echo -e "${GREEN}Script akan mengonfigurasi Pasar Desa di Port ${APP_PORT} secara TERISOLASI agar Warung Pulsa TIDAK BENTROK.${NC}"
+    echo -e "${GREEN}[INFO] Terdeteksi aplikasi Warung Pulsa di VPS ini.${NC}"
+    echo -e "${GREEN}Pasar Desa akan dipasang di Port ${APP_PORT} (terisolasi) agar Warung Pulsa tetap aman 100%.${NC}"
 fi
 
 # 3. Update Sistem & Instalasi Paket Dasar
@@ -86,26 +87,32 @@ echo -e "${YELLOW}==> [5/7] Menginstal dependensi NPM aplikasi...${NC}"
 cd "$APP_DIR"
 npm install --omit=dev
 
-# Buat direktori data SQLite jika belum ada
+# Siapkan direktori data SQLite
 mkdir -p "$APP_DIR/data"
 
-# Buat file .env dari .env.example jika belum ada
+# Siapkan file .env dengan konfigurasi Google SSO
+echo -e "${YELLOW}==> [6/7] Menyiapkan konfigurasi .env & Google SSO...${NC}"
 if [ ! -f "$APP_DIR/.env" ]; then
-    echo "Menyiapkan file .env baru dari .env.example..."
     cp "$APP_DIR/.env.example" "$APP_DIR/.env"
     sed -i "s/PORT=3000/PORT=3001/g" "$APP_DIR/.env"
     chmod 600 "$APP_DIR/.env"
+else
+    # Pastikan variabel Google SSO ada di file .env jika sebelumnya belum ada
+    if ! grep -q "GOOGLE_CLIENT_ID" "$APP_DIR/.env"; then
+        echo 'GOOGLE_CLIENT_ID="727817597785-oub85kbvvsl640v7q4cak661vn5jt7kh.apps.googleusercontent.com"' >> "$APP_DIR/.env"
+    fi
+    if ! grep -q "ADMIN_EMAIL" "$APP_DIR/.env"; then
+        echo 'ADMIN_EMAIL="syamsul18782@gmail.com"' >> "$APP_DIR/.env"
+    fi
 fi
 
 # 7. Konfigurasi Nginx Reverse Proxy Multi-Site Aman
-echo -e "${YELLOW}==> [6/7] Mengonfigurasi Nginx Reverse Proxy Pasar Desa (Port ${APP_PORT})...${NC}"
+echo -e "${YELLOW}==> [7/7] Mengonfigurasi Nginx Reverse Proxy Pasar Desa (Port ${APP_PORT})...${NC}"
 
-# Cek domain dari argumen atau environment (DOMAIN=contoh.com bash pasardesainstall.sh)
 DESA_DOMAIN="${DOMAIN:-}"
 
 if [ -n "$DESA_DOMAIN" ]; then
-    # Jika diberikan domain khusus
-    echo "Menggunakan domain khusus: $DESA_DOMAIN"
+    echo "Mengonfigurasi domain khusus: $DESA_DOMAIN"
     cat > /etc/nginx/sites-available/pasar-desa << EOF
 server {
     listen 80;
@@ -132,7 +139,6 @@ server {
 }
 EOF
 else
-    # Jika belum ada domain dan berjalan bersama warungpulsa
     if [ "$HAS_WARUNGPULSA" = true ]; then
         echo "Mengatur Pasar Desa pada Port 8080 agar Port 80 Warung Pulsa tetap aman..."
         cat > /etc/nginx/sites-available/pasar-desa << EOF
@@ -161,7 +167,6 @@ server {
 }
 EOF
     else
-        # VPS Fresh (belum ada warungpulsa)
         cat > /etc/nginx/sites-available/pasar-desa << EOF
 server {
     listen 80 default_server;
@@ -192,12 +197,12 @@ EOF
     fi
 fi
 
-# Aktifkan site pasar-desa di Nginx (tanpa menghapus site warungpulsa!)
+# Aktifkan site pasar-desa di Nginx
 ln -sf /etc/nginx/sites-available/pasar-desa /etc/nginx/sites-enabled/pasar-desa
 nginx -t && systemctl restart nginx
 
-# 8. Menjalankan Aplikasi via PM2 (Nama proses independen: pasar-desa)
-echo -e "${YELLOW}==> [7/7] Menjalankan Pasar Desa via PM2 Process Manager...${NC}"
+# 8. Menjalankan Aplikasi via PM2
+echo -e "${YELLOW}==> Menjalankan Pasar Desa via PM2 Process Manager...${NC}"
 cd "$APP_DIR"
 pm2 delete pasar-desa 2>/dev/null || true
 pm2 start ecosystem.config.js
@@ -210,19 +215,18 @@ ufw allow 22/tcp 2>/dev/null || true
 ufw allow 8080/tcp 2>/dev/null || true
 ufw allow 3001/tcp 2>/dev/null || true
 
-# Deteksi IP Publik Server VPS
 SERVER_IP=$(curl -s ifconfig.me || curl -s icanhazip.com || echo "IP_VPS_ANDA")
 
 echo ""
 echo -e "${GREEN}=================================================================="
-echo "    🎉 INSTALASI PASAR DESA BERHASIL & AMAN DARI BENTROK!        "
+echo "    🎉 INSTALASI PASAR DESA NUSANTARA BERHASIL SELESAI!          "
 echo "==================================================================${NC}"
 echo ""
 
 if [ "$HAS_WARUNGPULSA" = true ]; then
     echo -e "${MAGENTA}🔍 STATUS DUA APLIKASI DI VPS INI:${NC}"
     echo -e "   1. 🏪 Warung Pulsa:  ${CYAN}http://${SERVER_IP}${NC} (Port 3000 - Tetap Normal & Tidak Terganggu)"
-    echo -e "   2. 🌾 Pasar Desa:    ${CYAN}http://${SERVER_IP}:8080${NC} (Port 3001 internal)"
+    echo -e "   2. 🌾 Pasar Desa:    ${CYAN}http://${SERVER_IP}:8080${NC} (Port 3001)"
     echo -e "      🏛️ Admin BUMDes:  ${CYAN}http://${SERVER_IP}:8080/admin${NC}"
 else
     echo -e "🌐 Website Pasar Desa aktif di:  ${CYAN}http://${SERVER_IP}${NC} atau ${CYAN}http://${SERVER_IP}:8080${NC}"
@@ -230,18 +234,20 @@ else
 fi
 
 echo ""
-echo -e "🔑 Kredensial Login Admin BUMDes:"
-echo -e "   - Username: ${YELLOW}admin${NC}"
-echo -e "   - Password: ${YELLOW}admin123${NC}"
+echo -e "🔑 ${YELLOW}METODE LOGIN RESMI: GOOGLE SSO (1-KLIK MASUK)${NC}"
+echo -e "   - Akun Google Super Admin: ${GREEN}syamsul18782@gmail.com${NC}"
+echo -e "   - Cukup klik tombol 'Sign in with Google' di halaman /admin"
+echo -e "   - Alternatif Login Manual: ${CYAN}admin${NC} / ${CYAN}admin123${NC}"
 echo ""
 echo -e "📁 Lokasi Pasar Desa: ${CYAN}/var/www/pasar-desa${NC}"
-echo -e "🔄 Perintah Cek Status: ${CYAN}pm2 status${NC} (Akan muncul warungpulsa & pasar-desa)"
+echo -e "⚙️ File Pengaturan:    ${CYAN}nano /var/www/pasar-desa/.env${NC}"
+echo -e "🔄 Perintah Status:    ${CYAN}pm2 status${NC} (Akan tampil warungpulsa & pasar-desa)"
 echo -e "📜 Cek Log Realtime:   ${CYAN}pm2 logs pasar-desa${NC}"
 echo ""
-echo -e "🔐 ${GREEN}JIKA INGIN MEMASANG DOMAIN TERPISAH UNTUK PASAR DESA:${NC}"
-echo "1. Arahkan DNS A Record domain baru (misal: pasardesa.id) ke IP: ${SERVER_IP}"
-echo "2. Edit Nginx:"
-echo "   nano /etc/nginx/sites-available/pasar-desa"
-echo "   (Ubah server_name _ menjadi server_name pasardesa.id www.pasardesa.id; dan listen 80;)"
-echo "3. Pasang SSL gratis: certbot --nginx -d pasardesa.id -d www.pasardesa.id"
+echo -e "🔐 ${GREEN}PANDUAN GOOGLE OAUTH & DOMAIN HTTPS:${NC}"
+echo "1. Pastikan domain atau IP VPS Anda didaftarkan di Google Cloud Console:"
+echo "   (Menu APIs & Services -> Credentials -> OAuth 2.0 Client -> Authorized JavaScript origins)"
+echo "   Tambahkan: http://${SERVER_IP}:8080 dan domain desa Anda jika sudah ada."
+echo "2. Pasang SSL Gratis jika domain sudah siap:"
+echo "   certbot --nginx -d pasardesa.id -d www.pasardesa.id"
 echo "=================================================================="

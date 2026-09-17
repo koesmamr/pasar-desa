@@ -7,6 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Google Identity Services (Google SSO) -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <link rel="stylesheet" href="/css/style.css">
   <style>
     body {
@@ -142,24 +144,66 @@
     .login-box {
       background: #FFF;
       width: 100%;
-      max-width: 400px;
+      max-width: 420px;
       border-radius: var(--radius-md);
       padding: 34px;
       box-shadow: var(--shadow-lg);
       border: 1px solid var(--border-color);
       text-align: center;
     }
+    .user-profile-badge {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(255,255,255,0.15);
+      padding: 6px 12px;
+      border-radius: var(--radius-full);
+      font-size: 13px;
+    }
+    .user-profile-badge img {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+    }
   </style>
 </head>
 <body>
 
-  <!-- 1. LOGIN SCREEN -->
+  <!-- 1. LOGIN SCREEN DENGAN GOOGLE SSO -->
   <div id="loginScreen" class="login-container">
     <div class="login-box">
       <div style="font-size: 44px; margin-bottom: 10px;">🏛️</div>
       <h2 style="font-size: 20px; font-weight: 800; color: var(--primary-brown-dark); margin-bottom: 6px;">Panel Pengelola BUMDes</h2>
-      <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 24px;">Masuk untuk mengelola produk & memantau PAD Desa</p>
+      <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 22px;">Masuk untuk mengelola produk & pantau PAD Desa</p>
       
+      <!-- GOOGLE SIGN IN (ADOP DARI WARUNG PULSA) -->
+      <div style="display: flex; flex-direction: column; align-items: center; margin-bottom: 18px;">
+        <div id="g_id_onload"
+             data-client_id="727817597785-oub85kbvvsl640v7q4cak661vn5jt7kh.apps.googleusercontent.com"
+             data-callback="handleGoogleLoginResponse"
+             data-auto_prompt="false">
+        </div>
+        <div class="g_id_signin"
+             data-type="standard"
+             data-shape="rectangular"
+             data-theme="outline"
+             data-text="signin_with"
+             data-size="large"
+             data-logo_alignment="left"
+             data-width="320">
+        </div>
+        <div style="font-size: 11px; color: #888; margin-top: 6px;">
+          Gunakan Akun Google yang terdaftar sebagai Admin
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; margin: 18px 0; color: #A09085; font-size: 12px;">
+        <span style="flex-grow: 1; height: 1px; background: #E8DFD3;"></span>
+        <span style="padding: 0 10px; font-weight: 600;">ATAU MASUK MANUAL</span>
+        <span style="flex-grow: 1; height: 1px; background: #E8DFD3;"></span>
+      </div>
+
+      <!-- FORM LOGIN MANUAL (FALLBACK) -->
       <form id="loginForm">
         <div class="form-group" style="text-align: left;">
           <label class="form-label">Username</label>
@@ -169,10 +213,11 @@
           <label class="form-label">Password</label>
           <input type="password" id="loginPassword" class="form-control" value="admin123" required>
         </div>
-        <button type="submit" class="btn-primary" style="width: 100%;">Masuk ke Panel</button>
+        <button type="submit" class="btn-primary" style="width: 100%;">Masuk Manual</button>
       </form>
-      <div style="margin-top: 18px; font-size: 12px; color: var(--text-muted);">
-        <a href="/" style="color: var(--terracotta);">&larr; Kembali ke Halaman Utama Toko</a>
+      
+      <div style="margin-top: 20px; font-size: 12px; color: var(--text-muted);">
+        <a href="/" style="color: var(--terracotta); font-weight: 600;">&larr; Kembali ke Halaman Utama Toko</a>
       </div>
     </div>
   </div>
@@ -217,7 +262,10 @@
           <h2 style="font-size: 22px; font-weight: 800; color: var(--primary-brown-dark);" id="adminPageTitle">Dashboard & Ringkasan PAD</h2>
           <p style="font-size: 13px; color: var(--text-muted);">Laporan kinerja toko dan pendapatan asli desa secara transparan</p>
         </div>
-        <div style="display: flex; gap: 10px;">
+        <div style="display: flex; align-items: center; gap: 14px;">
+          <div id="adminProfileHeader" style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--primary-brown-dark);">
+            <!-- Diisi profil Google login -->
+          </div>
           <a href="/" target="_blank" class="btn-secondary" style="font-size: 13px; padding: 8px 16px;">
             🌐 Lihat Web Toko
           </a>
@@ -308,11 +356,11 @@
         </div>
       </div>
 
-      <!-- TAB 4: PENGATURAN (WHITELABEL DESA) -->
+      <!-- TAB 4: PENGATURAN (WHITELABEL DESA & GOOGLE SSO) -->
       <div id="tabSettings" style="display: none;">
         <div class="data-table-card" style="max-width: 720px;">
           <h3 style="font-size: 16px; font-weight: 700; color: var(--primary-brown-dark); margin-bottom: 18px;">
-            Pengaturan Profil Desa & BUMDes (Whitelabel Multi-Desa)
+            Pengaturan Profil Desa, BUMDes & Google SSO
           </h3>
           <form id="settingsForm">
             <div class="form-group">
@@ -328,11 +376,19 @@
               <input type="text" id="setTagline" class="form-control" required>
             </div>
             <div class="form-group">
-              <label class="form-label">Nomor WhatsApp Admin BUMDes (Tujuan Notifikasi Order)</label>
+              <label class="form-label">Email Google Super Admin (Untuk Akses Google SSO)</label>
+              <input type="email" id="setAdminEmail" class="form-control" placeholder="syamsul18782@gmail.com" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Google OAuth Client ID</label>
+              <input type="text" id="setGoogleClientId" class="form-control" placeholder="7278...apps.googleusercontent.com" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Nomor WhatsApp Admin BUMDes (Tujuan Order Masuk)</label>
               <input type="text" id="setWa" class="form-control" placeholder="6281234567890" required>
             </div>
             <div class="form-group">
-              <label class="form-label">Persentase PAD Desa (%)</label>
+              <label class="form-label">Persentase Alokasi Kas PAD Desa (%)</label>
               <input type="number" id="setPadPercent" class="form-control" min="0" max="100" required>
             </div>
             <div class="form-group">
@@ -344,7 +400,7 @@
               <input type="text" id="setBankAccount" class="form-control" required>
             </div>
             <div class="form-group">
-              <label class="form-label">Atas Nama Rekening</label>
+              <label class="form-label">Atas Nama Rekening Bank</label>
               <input type="text" id="setBankHolder" class="form-control" required>
             </div>
             <button type="submit" class="btn-primary" style="margin-top: 10px;">Simpan Perubahan Desa</button>
@@ -355,7 +411,7 @@
     </main>
   </div>
 
-  <!-- MODAL FORM PRODUK (TAMBAH / EDIT) -->
+  <!-- MODAL FORM PRODUK -->
   <div class="modal-overlay" id="productModal">
     <div class="modal-dialog">
       <div class="modal-header">
