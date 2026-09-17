@@ -1,0 +1,309 @@
+﻿<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pasar Desa Nusantara - Lokal, Asli, Berkualitas</title>
+  <meta name="description" content="Platform e-commerce Pasar Desa Nusantara. Belanja produk asli desa, kerajinan tangan, kopi organik, hasil tani, dan dukung PAD (Pendapatan Asli Desa).">
+  <!-- Google Fonts: Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+  <!-- 1. Header Top Bar -->
+  <div class="header-top">
+    <div class="container">
+      <div class="header-top-left">
+        <span>🌾 Toko Resmi <strong class="conf-bumdes-name">BUMDes Berkah Mandiri</strong> - <span class="conf-desa-name">Desa Nusantara</span></span>
+        <span class="badge-pad">PAD Desa Terintegrasi</span>
+      </div>
+      <div class="header-top-right">
+        <span>📞 Bantuan: <strong class="conf-wa">BUMDes Center</strong></span>
+        <a href="/admin" style="color: #FFE6CC; font-weight: 600;">🔐 Login Pengelola BUMDes</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Main Navigation Bar -->
+  <nav class="main-navbar">
+    <div class="container navbar-wrapper">
+      
+      <!-- Brand Logo -->
+      <a href="/" class="brand-logo">
+        <div class="brand-icon">🏡</div>
+        <div class="brand-text">
+          <h1 class="conf-desa-name">PASAR DESA NUSANTARA</h1>
+          <span class="conf-tagline">Lokal, Asli, Berkualitas</span>
+        </div>
+      </a>
+
+      <!-- Menu Navigasi Sesuai Mockup -->
+      <ul class="nav-links">
+        <li><a href="#beranda" class="active">Beranda</a></li>
+        <li><a href="#produk">Produk</a></li>
+        <li><a href="#kategori" onclick="filterCategory('pangan')">Kategori Pangan</a></li>
+        <li><a href="#kategori" onclick="filterCategory('makanan-minuman')">Makanan & Minuman</a></li>
+        <li><a href="#kategori" onclick="filterCategory('pertanian')">Pertanian</a></li>
+        <li><a href="#kategori" onclick="filterCategory('kerajinan')">Kerajinan</a></li>
+        <li><a href="#cerita-desa">Cerita Desa</a></li>
+      </ul>
+
+      <!-- Pencarian Produk Sesuai Mockup -->
+      <div class="search-box">
+        <i>🔍</i>
+        <input type="text" id="searchInput" placeholder="Cari Produk Desa..." autocomplete="off">
+      </div>
+
+      <!-- Action: Cart Button -->
+      <div class="nav-actions">
+        <button class="btn-cart-nav" id="openCartBtn" title="Keranjang Belanja">
+          🛒
+          <span class="cart-badge cart-count-val">0</span>
+        </button>
+      </div>
+
+    </div>
+  </nav>
+
+  <!-- 3. Hero Banner Section Sesuai Mockup Gambar 1 -->
+  <header class="hero-section" id="beranda">
+    <div class="container hero-content">
+      <div class="hero-emblem">
+        <span>🏛️</span> Dikelola Bersama BUMDes & Kelompok UMKM Warga
+      </div>
+      <h2 class="hero-title">PASAR DESA NUSANTARA</h2>
+      <p class="hero-subtitle">Membawa Hasil Bumi Terbaik, Kerajinan Otentik, dan Tradisi Luhur Desa Langsung ke Rumah Anda</p>
+      
+      <div class="hero-badges">
+        <div class="hero-badge-item">🌿 100% Produk Lokal</div>
+        <div class="hero-badge-item">✨ Kualitas Terjamin & Asli</div>
+        <div class="hero-badge-item">🤝 Berdayakan Ekonomi Warga</div>
+      </div>
+
+      <div class="hero-cta">
+        <a href="#produk" class="btn-primary">🛍️ Belanja Produk Unggulan</a>
+        <a href="#cerita-desa" class="btn-secondary">📖 Cerita & Jejak Perajin</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- 4. Category Tabs Section -->
+  <section class="category-bar-section" id="kategori">
+    <div class="container">
+      <div class="category-scroll" id="categoryPills">
+        <!-- Dimuat Dinamis via app.js -->
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. Produk Unggulan Desa (Mockup Cards) -->
+  <main class="container" id="produk">
+    <div class="section-title-wrap">
+      <h2 class="section-title">Produk Unggulan Desa</h2>
+      <p class="section-desc">Pilihan terbaik karya petani, perajin, dan kelompok wanita tani binaan BUMDes</p>
+    </div>
+
+    <!-- Grid Produk -->
+    <div class="products-grid" id="productsGrid">
+      <!-- Dimuat Dinamis via app.js -->
+    </div>
+
+    <!-- 6. Banner Dampak PAD (Pendapatan Asli Desa) -->
+    <div class="pad-impact-card">
+      <div class="pad-impact-left">
+        <h2>🌱 Berbelanja Sambil Membangun Desa</h2>
+        <p>Setiap transaksi di Pasar Desa Nusantara menyisihkan <strong class="conf-pad-percent">5%</strong> langsung ke kas Pendapatan Asli Desa (PAD) untuk membiayai layanan posyandu balita, beasiswa anak petani, dan perbaikan sarana irigasi pertanian warga.</p>
+      </div>
+      <div class="pad-stats-row">
+        <div class="pad-stat-item">
+          <div class="pad-stat-number">100%</div>
+          <div class="pad-stat-label">Produk Asli Desa</div>
+        </div>
+        <div class="pad-stat-item">
+          <div class="pad-stat-number">45+</div>
+          <div class="pad-stat-label">UMKM & Petani</div>
+        </div>
+        <div class="pad-stat-item">
+          <div class="pad-stat-number">PAD</div>
+          <div class="pad-stat-label">Kas Desa Mandiri</div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- 7. Section Cerita Desa (Sesuai Mockup Gambar 1) -->
+  <section class="stories-section" id="cerita-desa">
+    <div class="container">
+      <div class="section-title-wrap">
+        <h2 class="section-title">Cerita Desa & Di Balik Layar</h2>
+        <p class="section-desc">Mengenal lebih dekat sosok tangguh petani dan perajin yang melahirkan setiap produk istimewa</p>
+      </div>
+
+      <div class="stories-grid" id="storiesGrid">
+        <!-- Dimuat Dinamis via app.js -->
+      </div>
+    </div>
+  </section>
+
+  <!-- 8. Testimoni & Metode Pembayaran Sesuai Mockup Gambar 1 -->
+  <section class="container trust-section">
+    <h3 style="font-size: 18px; color: var(--primary-brown-dark); font-weight: 700; margin-bottom: 4px;">Metode Pembayaran & Pengiriman Terpercaya</h3>
+    <p style="font-size: 13px; color: var(--text-muted);">Transaksi aman, cepat, dan terverifikasi otomatis</p>
+    
+    <div class="payment-logos">
+      <div class="payment-badge">🏦 Bank BCA</div>
+      <div class="payment-badge">🏛️ Bank Mandiri</div>
+      <div class="payment-badge">🏢 Bank BRI</div>
+      <div class="payment-badge">⚡ QRIS Nasional</div>
+      <div class="payment-badge">📱 GoPay</div>
+      <div class="payment-badge">🟣 OVO</div>
+      <div class="payment-badge">📦 Ekspedisi JNE & J&T</div>
+      <div class="payment-badge">🚚 Kargo BUMDes</div>
+    </div>
+  </section>
+
+  <!-- 9. Footer Sesuai Mockup Gambar 1 -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-top">
+        <div class="brand-logo">
+          <div class="brand-icon">🏡</div>
+          <div>
+            <h2 style="font-size: 16px; font-weight: 800; color: #FFF;" class="conf-desa-name">PASAR DESA NUSANTARA</h2>
+            <p style="font-size: 12px; color: #F2D5BE;">Kemandirian Ekonomi Desa Berkelanjutan</p>
+          </div>
+        </div>
+        <ul class="footer-links">
+          <li><a href="#beranda">Hubungi Kami</a></li>
+          <li><a href="#faq">FAQ</a></li>
+          <li><a href="#pengiriman">Pengiriman</a></li>
+          <li><a href="/admin">Portal Pengelola</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-bottom">
+        <div>&copy; 2026 Pasar Desa Nusantara. Hak Cipta Dilindungi Undang-Undang.</div>
+        <div>Inisiatif Pemberdayaan Ekonomi & BUMDes Digital.</div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ==========================================================================
+       CART SLIDE-OVER DRAWER
+       ========================================================================== -->
+  <div class="cart-drawer-overlay" id="cartOverlay"></div>
+  <div class="cart-drawer" id="cartDrawer">
+    <div class="cart-header">
+      <h2>🛒 Keranjang Belanja (<span class="cart-count-val">0</span>)</h2>
+      <button class="btn-close-cart" id="closeCartBtn">&times;</button>
+    </div>
+
+    <div class="cart-items-wrap">
+      <div id="cartEmptyState" class="cart-empty-state">
+        <i>🧺</i>
+        <h4>Keranjang Anda Kosong</h4>
+        <p>Ayo pilih produk unggulan desa kesukaan Anda!</p>
+      </div>
+      <div id="cartItemsList"></div>
+    </div>
+
+    <div class="cart-footer" id="cartFooter" style="display: none;">
+      <div class="cart-summary-row">
+        <span>Subtotal Produk:</span>
+        <strong id="cartSubtotal">Rp 0</strong>
+      </div>
+      <div class="cart-summary-row" style="color: #2E7D32; font-size: 13px;">
+        <span>Kontribusi PAD Desa (<span class="conf-pad-percent">5%</span>):</span>
+        <strong id="cartPadEst">Rp 0</strong>
+      </div>
+      <div class="cart-total-row">
+        <span>Total Pembayaran:</span>
+        <strong id="cartTotal">Rp 0</strong>
+      </div>
+      <button class="btn-checkout-flow" onclick="openCheckoutModal()">
+        Lanjut ke Pemesanan & Checkout &rarr;
+      </button>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       CHECKOUT MODAL
+       ========================================================================== -->
+  <div class="modal-overlay" id="checkoutModal">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 style="font-size: 16px;">Formulir Pemesanan Produk Desa</h3>
+        <button onclick="closeCheckoutModal()" style="background: none; color: #FFF; font-size: 22px;">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="checkoutForm">
+          <div class="form-group">
+            <label class="form-label">Nama Lengkap Pembeli *</label>
+            <input type="text" id="orderName" class="form-control" placeholder="Contoh: Budi Santoso" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Nomor WhatsApp Aktif *</label>
+            <input type="tel" id="orderPhone" class="form-control" placeholder="Contoh: 081234567890" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Alamat Lengkap Pengiriman *</label>
+            <textarea id="orderAddress" class="form-control" rows="3" placeholder="Nama Jalan, RT/RW, Dusun/Kelurahan, Kecamatan, Kota/Kabupaten, Kode Pos" required></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Pilihan Jasa Ekspedisi</label>
+            <select id="orderCourier" class="form-control">
+              <option value="JNE Regular / Cargo">JNE Regular / JNE Trucking</option>
+              <option value="J&T Express">J&T Express</option>
+              <option value="SiCepat Reguler">SiCepat</option>
+              <option value="Kurir Lokal BUMDes">Kurir Lokal BUMDes (Khusus Dalam Desa/Kecamatan)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Metode Pembayaran</label>
+            <select id="orderPayment" class="form-control">
+              <option value="wa">📱 Pesan & Konfirmasi via WhatsApp (Paling Mudah)</option>
+              <option value="qris">⚡ QRIS BUMDes (BCA, Mandiri, BRI, GoPay, OVO, ShopeePay)</option>
+              <option value="transfer">🏦 Transfer Bank Resmi BUMDes</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Catatan Tambahan (Opsional)</label>
+            <input type="text" id="orderNotes" class="form-control" placeholder="Contoh: Titipkan di satpam / packing kayu">
+          </div>
+          <button type="submit" class="btn-primary" style="width: 100%; padding: 13px; font-size: 15px; margin-top: 10px;">
+            Kirim & Proses Pesanan Sekarang
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       INVOICE / QRIS MODAL
+       ========================================================================== -->
+  <div class="modal-overlay" id="invoiceModal">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 style="font-size: 16px;">Detail Pembayaran Pesanan</h3>
+        <button onclick="closeInvoiceModal()" style="background: none; color: #FFF; font-size: 22px;">&times;</button>
+      </div>
+      <div class="modal-body" id="invoiceModalBody">
+        <!-- Diisi secara dinamis oleh app.js -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Floating WhatsApp Button -->
+  <a href="#" id="floatingWaBtn" target="_blank" class="floating-wa" title="Chat WhatsApp BUMDes">
+    <span style="font-size: 20px;">💬</span>
+    <span>Hubungi BUMDes</span>
+  </a>
+
+  <!-- Script Application -->
+  <script src="/js/app.js"></script>
+</body>
+</html>

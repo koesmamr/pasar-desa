@@ -1,0 +1,420 @@
+﻿<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel Pengelola - Pasar Desa Nusantara</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    body {
+      background-color: #F5EFEB;
+      min-height: 100vh;
+    }
+    .admin-layout {
+      display: flex;
+      min-height: 100vh;
+    }
+    .admin-sidebar {
+      width: 260px;
+      background: #5C2B10;
+      color: #FFF;
+      flex-shrink: 0;
+      padding: 24px 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .admin-sidebar-header {
+      padding: 0 20px 20px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .admin-nav {
+      list-style: none;
+      padding: 20px 0;
+      flex-grow: 1;
+    }
+    .admin-nav-item {
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #E2D2C7;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .admin-nav-item:hover, .admin-nav-item.active {
+      color: #FFF;
+      background: rgba(255,255,255,0.12);
+      border-left: 4px solid var(--terracotta);
+    }
+    .admin-main {
+      flex-grow: 1;
+      padding: 30px;
+      overflow-y: auto;
+    }
+    .admin-topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+    .admin-stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 18px;
+      margin-bottom: 30px;
+    }
+    .stat-card {
+      background: #FFF;
+      border-radius: var(--radius-md);
+      padding: 20px;
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--border-color);
+    }
+    .stat-card.pad-highlight {
+      background: linear-gradient(135deg, #1B5E20 0%, #2E7D32 100%);
+      color: #FFF;
+      border: none;
+    }
+    .stat-val {
+      font-size: 24px;
+      font-weight: 800;
+      margin-top: 4px;
+    }
+    .stat-lbl {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .stat-card.pad-highlight .stat-lbl {
+      color: #E8F5E9;
+    }
+    .data-table-card {
+      background: #FFF;
+      border-radius: var(--radius-md);
+      padding: 20px;
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--border-color);
+      margin-bottom: 30px;
+    }
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 14px;
+      font-size: 13px;
+    }
+    .data-table th, .data-table td {
+      padding: 12px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .data-table th {
+      background: #FAF6EE;
+      color: var(--primary-brown-dark);
+      font-weight: 700;
+    }
+    .status-badge {
+      padding: 4px 10px;
+      border-radius: var(--radius-full);
+      font-size: 11px;
+      font-weight: 700;
+      display: inline-block;
+    }
+    .status-pending { background: #FFF3E0; color: #E65100; }
+    .status-diproses { background: #E3F2FD; color: #1565C0; }
+    .status-dikirim { background: #EDE7F6; color: #512DA8; }
+    .status-selesai { background: #E8F5E9; color: #2E7D32; }
+    .status-batal { background: #FFEBEE; color: #C62828; }
+
+    /* Login Screen */
+    .login-container {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .login-box {
+      background: #FFF;
+      width: 100%;
+      max-width: 400px;
+      border-radius: var(--radius-md);
+      padding: 34px;
+      box-shadow: var(--shadow-lg);
+      border: 1px solid var(--border-color);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 1. LOGIN SCREEN -->
+  <div id="loginScreen" class="login-container">
+    <div class="login-box">
+      <div style="font-size: 44px; margin-bottom: 10px;">🏛️</div>
+      <h2 style="font-size: 20px; font-weight: 800; color: var(--primary-brown-dark); margin-bottom: 6px;">Panel Pengelola BUMDes</h2>
+      <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 24px;">Masuk untuk mengelola produk & memantau PAD Desa</p>
+      
+      <form id="loginForm">
+        <div class="form-group" style="text-align: left;">
+          <label class="form-label">Username</label>
+          <input type="text" id="loginUsername" class="form-control" value="admin" required>
+        </div>
+        <div class="form-group" style="text-align: left; margin-bottom: 20px;">
+          <label class="form-label">Password</label>
+          <input type="password" id="loginPassword" class="form-control" value="admin123" required>
+        </div>
+        <button type="submit" class="btn-primary" style="width: 100%;">Masuk ke Panel</button>
+      </form>
+      <div style="margin-top: 18px; font-size: 12px; color: var(--text-muted);">
+        <a href="/" style="color: var(--terracotta);">&larr; Kembali ke Halaman Utama Toko</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. ADMIN DASHBOARD LAYOUT -->
+  <div id="adminPanel" class="admin-layout" style="display: none;">
+    <!-- Sidebar -->
+    <aside class="admin-sidebar">
+      <div class="admin-sidebar-header">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="font-size: 26px;">🌾</div>
+          <div>
+            <h3 style="font-size: 15px; font-weight: 800;">PASAR DESA</h3>
+            <span style="font-size: 11px; color: #F2D5BE;" id="adminSidebarBumdes">BUMDes Berkah</span>
+          </div>
+        </div>
+      </div>
+
+      <ul class="admin-nav">
+        <li class="admin-nav-item active" onclick="switchAdminTab('dashboard', this)">
+          <span>📊</span> Dashboard & PAD
+        </li>
+        <li class="admin-nav-item" onclick="switchAdminTab('products', this)">
+          <span>🛍️</span> Kelola Produk
+        </li>
+        <li class="admin-nav-item" onclick="switchAdminTab('orders', this)">
+          <span>📦</span> Daftar Pesanan
+        </li>
+        <li class="admin-nav-item" onclick="switchAdminTab('settings', this)">
+          <span>⚙️</span> Profil Desa & Whitelabel
+        </li>
+        <li class="admin-nav-item" style="margin-top: 30px; color: #FFCDD2;" onclick="adminLogout()">
+          <span>🚪</span> Keluar (Logout)
+        </li>
+      </ul>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="admin-main">
+      <div class="admin-topbar">
+        <div>
+          <h2 style="font-size: 22px; font-weight: 800; color: var(--primary-brown-dark);" id="adminPageTitle">Dashboard & Ringkasan PAD</h2>
+          <p style="font-size: 13px; color: var(--text-muted);">Laporan kinerja toko dan pendapatan asli desa secara transparan</p>
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <a href="/" target="_blank" class="btn-secondary" style="font-size: 13px; padding: 8px 16px;">
+            🌐 Lihat Web Toko
+          </a>
+        </div>
+      </div>
+
+      <!-- TAB 1: DASHBOARD -->
+      <div id="tabDashboard">
+        <div class="admin-stats-grid">
+          <div class="stat-card pad-highlight">
+            <div class="stat-lbl">KAS PAD DESA TERKUMPUL</div>
+            <div class="stat-val" id="statPad">Rp 0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-lbl">TOTAL OMZET KOTOR</div>
+            <div class="stat-val" style="color: var(--primary-brown-dark);" id="statOmzet">Rp 0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-lbl">TOTAL PESANAN</div>
+            <div class="stat-val" id="statOrders">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-lbl">PRODUK AKTIF</div>
+            <div class="stat-val" id="statProducts">0</div>
+          </div>
+        </div>
+
+        <div class="data-table-card">
+          <h3 style="font-size: 16px; font-weight: 700; color: var(--primary-brown-dark);">Pesanan Masuk Terbaru</h3>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Invoice</th>
+                <th>Nama Pembeli</th>
+                <th>No WhatsApp</th>
+                <th>Total Tagihan</th>
+                <th>PAD Desa</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="recentOrdersBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- TAB 2: PRODUK -->
+      <div id="tabProducts" style="display: none;">
+        <div class="data-table-card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+            <h3 style="font-size: 16px; font-weight: 700; color: var(--primary-brown-dark);">Katalog Produk Unggulan Desa</h3>
+            <button class="btn-primary" onclick="openProductModal()">+ Tambah Produk Baru</button>
+          </div>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Foto</th>
+                <th>Nama Produk</th>
+                <th>Kategori</th>
+                <th>Harga</th>
+                <th>Stok</th>
+                <th>Perajin / Dusun</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="productsTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- TAB 3: PESANAN -->
+      <div id="tabOrders" style="display: none;">
+        <div class="data-table-card">
+          <h3 style="font-size: 16px; font-weight: 700; color: var(--primary-brown-dark); margin-bottom: 14px;">Semua Pesanan Pelanggan</h3>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Kode</th>
+                <th>Tanggal</th>
+                <th>Pembeli & WA</th>
+                <th>Alamat</th>
+                <th>Total Belanja</th>
+                <th>PAD</th>
+                <th>Status Pesanan</th>
+              </tr>
+            </thead>
+            <tbody id="allOrdersTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- TAB 4: PENGATURAN (WHITELABEL DESA) -->
+      <div id="tabSettings" style="display: none;">
+        <div class="data-table-card" style="max-width: 720px;">
+          <h3 style="font-size: 16px; font-weight: 700; color: var(--primary-brown-dark); margin-bottom: 18px;">
+            Pengaturan Profil Desa & BUMDes (Whitelabel Multi-Desa)
+          </h3>
+          <form id="settingsForm">
+            <div class="form-group">
+              <label class="form-label">Nama Desa</label>
+              <input type="text" id="setDesaName" class="form-control" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Nama BUMDes</label>
+              <input type="text" id="setBumdesName" class="form-control" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Tagline Toko</label>
+              <input type="text" id="setTagline" class="form-control" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Nomor WhatsApp Admin BUMDes (Tujuan Notifikasi Order)</label>
+              <input type="text" id="setWa" class="form-control" placeholder="6281234567890" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Persentase PAD Desa (%)</label>
+              <input type="number" id="setPadPercent" class="form-control" min="0" max="100" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Nama Bank Rekening BUMDes</label>
+              <input type="text" id="setBankName" class="form-control" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Nomor Rekening Bank</label>
+              <input type="text" id="setBankAccount" class="form-control" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Atas Nama Rekening</label>
+              <input type="text" id="setBankHolder" class="form-control" required>
+            </div>
+            <button type="submit" class="btn-primary" style="margin-top: 10px;">Simpan Perubahan Desa</button>
+          </form>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- MODAL FORM PRODUK (TAMBAH / EDIT) -->
+  <div class="modal-overlay" id="productModal">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 id="productModalTitle">Tambah Produk Baru</h3>
+        <button onclick="closeProductModal()" style="background: none; color: #FFF; font-size: 22px;">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="productForm">
+          <input type="hidden" id="prodId">
+          <div class="form-group">
+            <label class="form-label">Nama Produk *</label>
+            <input type="text" id="prodName" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Kategori *</label>
+            <select id="prodCategory" class="form-control" required></select>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label class="form-label">Harga Jual (Rp) *</label>
+              <input type="number" id="prodPrice" class="form-control" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Harga Coret (Opsional)</label>
+              <input type="number" id="prodOriginalPrice" class="form-control" value="0">
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label class="form-label">Stok Tersedia</label>
+              <input type="number" id="prodStock" class="form-control" value="10">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Satuan</label>
+              <input type="text" id="prodUnit" class="form-control" value="pcs">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">URL Foto Produk</label>
+            <input type="url" id="prodImageUrl" class="form-control" placeholder="https://..." required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Nama Perajin / Kelompok Tani</label>
+            <input type="text" id="prodMaker" class="form-control" placeholder="Contoh: KWT Melati Dusun 1">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Asal Dusun / Desa</label>
+            <input type="text" id="prodVillage" class="form-control" placeholder="Contoh: Dusun Krajan">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Deskripsi Lengkap Produk</label>
+            <textarea id="prodDesc" class="form-control" rows="3"></textarea>
+          </div>
+          <button type="submit" class="btn-primary" style="width: 100%; margin-top: 10px;">Simpan Produk</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/admin.js"></script>
+</body>
+</html>
