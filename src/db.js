@@ -154,6 +154,16 @@ function initDatabase() {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
 
+      CREATE TABLE IF NOT EXISTS bank_accounts (
+        id TEXT PRIMARY KEY,
+        bank_name TEXT NOT NULL,
+        account_number TEXT NOT NULL,
+        account_holder TEXT NOT NULL,
+        is_active INTEGER DEFAULT 1,
+        sort_order INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+
       CREATE TABLE IF NOT EXISTS orders (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         order_code TEXT UNIQUE NOT NULL,
@@ -162,7 +172,13 @@ function initDatabase() {
         customer_phone TEXT NOT NULL,
         customer_address TEXT NOT NULL,
         courier TEXT DEFAULT 'Kurir Desa / JNE',
-        payment_method TEXT DEFAULT 'qris',
+        payment_method TEXT DEFAULT 'cod',
+        bank_name TEXT DEFAULT '',
+        payment_proof_url TEXT DEFAULT '',
+        pic_name TEXT DEFAULT '',
+        pic_address TEXT DEFAULT '',
+        dp_amount INTEGER DEFAULT 0,
+        due_date TEXT DEFAULT '',
         total_amount INTEGER NOT NULL,
         pad_amount INTEGER DEFAULT 0,
         status TEXT DEFAULT 'pending',
@@ -172,9 +188,15 @@ function initDatabase() {
       );
     `);
 
-    // Migrasi kolom jika tabel lama belum memiliki kolom baru
+    // Migrasi kolom jika tabel lama belum memiliki kolom baru (Adopsi BintangCOD)
     try { db.exec('ALTER TABLE users ADD COLUMN is_blocked INTEGER DEFAULT 0;'); } catch (e) {}
     try { db.exec('ALTER TABLE orders ADD COLUMN customer_email TEXT DEFAULT "";'); } catch (e) {}
+    try { db.exec('ALTER TABLE orders ADD COLUMN bank_name TEXT DEFAULT "";'); } catch (e) {}
+    try { db.exec('ALTER TABLE orders ADD COLUMN payment_proof_url TEXT DEFAULT "";'); } catch (e) {}
+    try { db.exec('ALTER TABLE orders ADD COLUMN pic_name TEXT DEFAULT "";'); } catch (e) {}
+    try { db.exec('ALTER TABLE orders ADD COLUMN pic_address TEXT DEFAULT "";'); } catch (e) {}
+    try { db.exec('ALTER TABLE orders ADD COLUMN dp_amount INTEGER DEFAULT 0;'); } catch (e) {}
+    try { db.exec('ALTER TABLE orders ADD COLUMN due_date TEXT DEFAULT "";'); } catch (e) {}
   }
 
   seedDefaults();
@@ -202,6 +224,24 @@ function seedDefaults() {
       db.prepare('INSERT INTO settings (key, value) VALUES (?, ?)').run(s.key, s.value);
     } else if (s.key === 'google_client_id' && existing.value.includes('727817597785')) {
       db.prepare('UPDATE settings SET value = ? WHERE key = ?').run(s.value, s.key);
+    }
+  }
+
+  // Rekening Bank & QRIS Default (Adopsi BintangCOD)
+  const defaultBankAccounts = [
+    { id: 'bank_bri', bank_name: 'Bank BRI', account_number: '0123-01-000456-50-8', account_holder: 'BUMDES BERKAH MANDIRI', is_active: 1, sort_order: 1 },
+    { id: 'bank_bca', bank_name: 'Bank BCA', account_number: '140-085-2402', account_holder: 'BUMDES BERKAH MANDIRI', is_active: 1, sort_order: 2 },
+    { id: 'bank_mandiri', bank_name: 'Bank Mandiri', account_number: '138-00-1988221-1', account_holder: 'BUMDES BERKAH MANDIRI', is_active: 1, sort_order: 3 },
+    { id: 'qris_bumdes', bank_name: 'QRIS Nasional (Semua Bank & E-Wallet)', account_number: '00020101021126670014ID.LINKAJA.WWW011893600911002230739902152026072010502280303UMI51440014ID.GO.QRIS.WWW0215ID10200234567890303UMI5204549953033605802ID5919PASAR DESA BUMDES6013KABUPATEN DES61051234562070703A016304ABCD', account_holder: 'BUMDes Pasar Desa Nusantara', is_active: 1, sort_order: 4 }
+  ];
+
+  for (const b of defaultBankAccounts) {
+    const exist = db.prepare('SELECT id FROM bank_accounts WHERE id = ?').get(b.id);
+    if (!exist) {
+      db.prepare(`
+        INSERT INTO bank_accounts (id, bank_name, account_number, account_holder, is_active, sort_order)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(b.id, b.bank_name, b.account_number, b.account_holder, b.is_active, b.sort_order);
     }
   }
 

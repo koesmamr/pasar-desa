@@ -115,6 +115,12 @@ function setupEventListeners() {
     settingsForm.addEventListener('submit', handleSettingsSubmit);
   }
 
+  // Form Rekening Bank (Adopsi BintangCOD)
+  const bankForm = document.getElementById('bankForm');
+  if (bankForm) {
+    bankForm.addEventListener('submit', handleBankSubmit);
+  }
+
   // File Upload Foto Produk (Base64 Langsung)
   const prodFileInput = document.getElementById('prodFileInput');
   if (prodFileInput) {
@@ -196,6 +202,8 @@ function switchAdminTab(tab, el) {
   document.getElementById('tabCategories').style.display = tab === 'categories' ? 'block' : 'none';
   document.getElementById('tabOrders').style.display = tab === 'orders' ? 'block' : 'none';
   document.getElementById('tabUsers').style.display = tab === 'users' ? 'block' : 'none';
+  const tabBanks = document.getElementById('tabBanks');
+  if (tabBanks) tabBanks.style.display = tab === 'banks' ? 'block' : 'none';
   document.getElementById('tabSettings').style.display = tab === 'settings' ? 'block' : 'none';
 
   const titles = {
@@ -204,6 +212,7 @@ function switchAdminTab(tab, el) {
     categories: 'Manajemen Kategori Produk',
     orders: 'Daftar Pesanan Pelanggan',
     users: 'Manajemen Pengguna (Google SSO)',
+    banks: 'Rekening Bank & QRIS Resmi BUMDes',
     settings: 'Pengaturan Profil Desa, BUMDes & Google SSO'
   };
 
@@ -213,6 +222,7 @@ function switchAdminTab(tab, el) {
     categories: 'Atur kelompok etalase produk desa dan icon emoji',
     orders: 'Kelola status pesanan masuk dan cetak struk invoice transaksi',
     users: 'Kelola akun pengguna, hak akses admin, dan status pemblokiran',
+    banks: 'Atur nomor rekening tujuan transfer dan payload QRIS untuk checkout pelanggan',
     settings: 'Ubah identitas desa, persentase PAD, nomor rekening, dan konfigurasi Google SSO'
   };
 
@@ -224,6 +234,7 @@ function switchAdminTab(tab, el) {
   if (tab === 'categories') loadCategoriesTable();
   if (tab === 'orders') loadOrdersTable();
   if (tab === 'users') loadUsersTable();
+  if (tab === 'banks') loadBanksTable();
   if (tab === 'settings') loadSettings();
 }
 
@@ -688,9 +699,39 @@ function viewOrderDetail(id) {
         <div><strong>No. WhatsApp:</strong> ${escapeHtml(o.customer_phone)}</div>
         <div><strong>Alamat Tujuan:</strong> ${escapeHtml(o.customer_address)}</div>
         <div><strong>Ekspedisi / Kurir:</strong> ${escapeHtml(o.courier || '-')}</div>
-        <div><strong>Metode Pembayaran:</strong> ${(o.payment_method || 'qris').toUpperCase()}</div>
+        <div><strong>Metode Pembayaran:</strong> ${getPaymentMethodLabel(o.payment_method)}</div>
+        ${o.bank_name ? `<div><strong>Rekening Bank Tujuan:</strong> ${escapeHtml(o.bank_name)}</div>` : ''}
+        ${o.pic_name ? `
+          <div style="background: #FFF8E1; padding: 8px 12px; border-radius: 6px; margin: 6px 0; border: 1px solid #FFE082;">
+            <strong>📋 Penanggung Jawab (PIC):</strong> ${escapeHtml(o.pic_name)} (${escapeHtml(o.pic_address || '-')})
+            ${o.due_date ? `<br><strong>📅 Jatuh Tempo:</strong> ${escapeHtml(o.due_date)}` : ''}
+          </div>
+        ` : ''}
         <div><strong>Status Pesanan:</strong> <span class="status-badge status-${o.status}">${(o.status || 'pending').toUpperCase()}</span></div>
         ${o.notes ? `<div><strong>Catatan:</strong> <em>${escapeHtml(o.notes)}</em></div>` : ''}
+
+        <!-- LAMPIRAN BUKTI TRANSFER (ADOPSI BINTANGCOD) -->
+        ${o.payment_proof_url ? `
+          <div style="background: #E8F5E9; border: 1px solid #A5D6A7; border-radius: 8px; padding: 12px; margin-top: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <strong style="color: #2E7D32; font-size: 13px;">🧾 Lampiran Bukti Transfer Pelanggan</strong>
+              <button type="button" onclick="showFullImageModal('${o.payment_proof_url}', 'Bukti Transfer #${o.order_code}')" style="background: none; color: #1565C0; font-size: 11px; font-weight: bold; cursor: pointer; text-decoration: underline;">
+                🔍 Lihat Ukuran Penuh
+              </button>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <img src="${o.payment_proof_url}" onclick="showFullImageModal('${o.payment_proof_url}', 'Bukti Transfer #${o.order_code}')" style="width: 70px; height: 70px; object-fit: cover; border-radius: 6px; border: 1px solid #DDD; cursor: pointer;" alt="Bukti Transfer">
+              <div>
+                <div style="font-size: 12px; color: #333;">Tujuan: <strong>${escapeHtml(o.bank_name || 'Rekening BUMDes')}</strong></div>
+                ${o.status === 'pending' ? `
+                  <button type="button" onclick="verifyPayment(${o.id})" style="background: #2E7D32; color: #FFF; border: none; border-radius: 4px; padding: 5px 12px; font-size: 11px; font-weight: bold; margin-top: 6px; cursor: pointer;">
+                    ✓ Verifikasi & Proses Pesanan
+                  </button>
+                ` : '<span style="color: #2E7D32; font-size: 11px; font-weight: bold;">✓ Pembayaran Sudah Diverifikasi</span>'}
+              </div>
+            </div>
+          </div>
+        ` : ''}
       </div>
 
       <!-- Tabel Item Belanja -->
@@ -721,6 +762,16 @@ function viewOrderDetail(id) {
           <span>Total Belanja:</span>
           <strong style="font-size: 16px; color: var(--primary-brown-dark);">Rp ${Number(o.total_amount).toLocaleString('id-ID')}</strong>
         </div>
+        ${o.dp_amount ? `
+          <div style="display: flex; justify-content: space-between; font-size: 12px; color: #00796B; margin-bottom: 2px;">
+            <span>Uang Muka (DP 30%):</span>
+            <strong>Rp ${Number(o.dp_amount).toLocaleString('id-ID')}</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 12px; color: #E65100; margin-bottom: 4px;">
+            <span>Sisa Tagihan Pelunasan:</span>
+            <strong>Rp ${Number(o.total_amount - o.dp_amount).toLocaleString('id-ID')}</strong>
+          </div>
+        ` : ''}
         <div style="display: flex; justify-content: space-between; color: #2E7D32; font-size: 12px;">
           <span>Kontribusi Kas PAD Desa:</span>
           <strong>Rp ${Number(o.pad_amount).toLocaleString('id-ID')}</strong>
@@ -746,7 +797,195 @@ function viewOrderDetail(id) {
   document.getElementById('orderDetailModal').classList.add('active');
 }
 
+function getPaymentMethodLabel(method) {
+  const map = {
+    cod: '🚚 Bayar di Tempat (COD)',
+    cash: '🏪 Tunai Langsung / Ambil di Toko',
+    transfer_qris: '📲 Transfer Bank & QRIS',
+    tempo: '⏳ Cash Tunda / Tempo 3 Hari',
+    dp_panjar: '💵 DP / Panjar 30%',
+    wa: '📱 WhatsApp'
+  };
+  return map[method] || (method || 'COD').toUpperCase();
+}
+
 function closeOrderDetailModal() {
+  document.getElementById('orderDetailModal').classList.remove('active');
+}
+
+// ==============================================================================
+// TAB 7: MANAJEMEN REKENING BANK & QRIS BUMDES (ADOPSI BINTANGCOD)
+// ==============================================================================
+let adminBankList = [];
+
+async function loadBanksTable() {
+  try {
+    const res = await fetch('/api/admin/payment/banks');
+    const data = await res.json();
+    if (!data.success) return checkAuthExpired(data);
+
+    adminBankList = data.banks || [];
+    const tbody = document.getElementById('banksTableBody');
+    if (!tbody) return;
+
+    if (adminBankList.length > 0) {
+      tbody.innerHTML = adminBankList.map(b => {
+        const isQris = (b.bank_name || '').toLowerCase().includes('qris');
+        return `
+          <tr>
+            <td>
+              <strong>${escapeHtml(b.bank_name)}</strong>
+              ${isQris ? '<span style="font-size: 10px; background: #EDE7F6; color: #512DA8; padding: 2px 6px; border-radius: 4px; margin-left: 4px; font-weight: bold;">⚡ QRIS</span>' : ''}
+            </td>
+            <td><code style="background: #FAF6EE; padding: 3px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">${escapeHtml(b.account_number)}</code></td>
+            <td>${escapeHtml(b.account_holder)}</td>
+            <td>${b.sort_order || 0}</td>
+            <td>
+              <button onclick="toggleBankActive('${b.id}')" class="btn-action-sm ${b.is_active ? 'btn-action-success' : 'btn-action-warning'}">
+                ${b.is_active ? '✓ Aktif' : '✗ Nonaktif'}
+              </button>
+            </td>
+            <td>
+              <div style="display: flex; gap: 4px;">
+                <button onclick="editBank('${b.id}')" class="btn-action-sm btn-action-edit">✏️ Edit</button>
+                <button onclick="deleteBank('${b.id}')" class="btn-action-sm btn-action-delete">🗑️ Hapus</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    } else {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#888; padding: 20px;">Belum ada rekening bank. Silakan tambah rekening baru.</td></tr>';
+    }
+  } catch (err) {
+    console.error('Error load banks:', err);
+  }
+}
+
+function openBankModal() {
+  document.getElementById('bankModalTitle').textContent = 'Tambah Rekening Bank / QRIS';
+  document.getElementById('bankId').value = '';
+  document.getElementById('bankForm').reset();
+  document.getElementById('inputBankActive').checked = true;
+  document.getElementById('bankModal').classList.add('active');
+}
+
+function closeBankModal() {
+  document.getElementById('bankModal').classList.remove('active');
+}
+
+function editBank(id) {
+  const b = adminBankList.find(it => it.id === id);
+  if (!b) return;
+
+  document.getElementById('bankModalTitle').textContent = 'Edit Rekening Bank / QRIS';
+  document.getElementById('bankId').value = b.id;
+  document.getElementById('inputBankName').value = b.bank_name || '';
+  document.getElementById('inputBankNumber').value = b.account_number || '';
+  document.getElementById('inputBankHolder').value = b.account_holder || '';
+  document.getElementById('inputBankOrder').value = b.sort_order || 0;
+  document.getElementById('inputBankActive').checked = b.is_active === 1;
+
+  document.getElementById('bankModal').classList.add('active');
+}
+
+async function handleBankSubmit(e) {
+  e.preventDefault();
+  const id = document.getElementById('bankId').value;
+  const payload = {
+    bank_name: document.getElementById('inputBankName').value.trim(),
+    account_number: document.getElementById('inputBankNumber').value.trim(),
+    account_holder: document.getElementById('inputBankHolder').value.trim(),
+    sort_order: parseInt(document.getElementById('inputBankOrder').value) || 0,
+    is_active: document.getElementById('inputBankActive').checked ? 1 : 0
+  };
+
+  const url = id ? `/api/admin/payment/banks/${id}` : '/api/admin/payment/banks';
+  const method = id ? 'PUT' : 'POST';
+
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (data.success) {
+      alert(data.message);
+      closeBankModal();
+      loadBanksTable();
+    } else {
+      alert('Gagal: ' + data.message);
+    }
+  } catch (err) {
+    alert('Kesalahan saat menyimpan rekening');
+  }
+}
+
+async function toggleBankActive(id) {
+  try {
+    const res = await fetch(`/api/admin/payment/banks/${id}/toggle`, { method: 'PUT' });
+    const data = await res.json();
+    if (data.success) {
+      loadBanksTable();
+    } else {
+      alert(data.message);
+    }
+  } catch (e) {
+    alert('Gagal mengubah status rekening');
+  }
+}
+
+async function deleteBank(id) {
+  if (!confirm('Yakin ingin menghapus rekening bank ini?')) return;
+  try {
+    const res = await fetch(`/api/admin/payment/banks/${id}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (data.success) {
+      loadBanksTable();
+    } else {
+      alert(data.message);
+    }
+  } catch (e) {
+    alert('Gagal menghapus rekening');
+  }
+}
+
+// Modal Foto Ukuran Penuh
+function showFullImageModal(src, title) {
+  const modal = document.getElementById('imagePreviewModal');
+  const img = document.getElementById('imagePreviewFull');
+  const titleEl = document.getElementById('imagePreviewTitle');
+
+  if (modal && img) {
+    img.src = src;
+    if (titleEl) titleEl.textContent = title || 'Bukti Transfer';
+    modal.classList.add('active');
+  }
+}
+
+function closeImagePreviewModal() {
+  const modal = document.getElementById('imagePreviewModal');
+  if (modal) modal.classList.remove('active');
+}
+
+async function verifyPayment(orderId) {
+  if (!confirm('Verifikasi bukti transfer ini dan ubah status pesanan menjadi DIPROSES?')) return;
+  try {
+    const res = await fetch(`/api/admin/orders/${orderId}/verify-payment`, { method: 'PUT' });
+    const data = await res.json();
+    if (data.success) {
+      alert(data.message);
+      closeOrderDetailModal();
+      loadOrdersTable();
+      loadStats();
+    } else {
+      alert(data.message);
+    }
+  } catch (e) {
+    alert('Gagal memverifikasi pembayaran');
+  }
+}
   document.getElementById('orderDetailModal').classList.remove('active');
 }
 

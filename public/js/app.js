@@ -417,12 +417,147 @@ function quickBuyWhatsApp(id, name, price) {
   window.open(`https://wa.me/${wa}?text=${encodeURIComponent(text)}`, '_blank');
 }
 
+// ==============================================================================
+// SISTEM PEMBAYARAN FLEKSIBEL (ADOPSI BINTANGCOD)
+// ==============================================================================
+let checkoutBankList = [];
+let uploadedPaymentProofBase64 = null;
+
+async function loadCheckoutBanks() {
+  const select = document.getElementById('selectCheckoutBank');
+  if (!select) return;
+
+  try {
+    const res = await fetch('/api/payment/banks');
+    const data = await res.json();
+    checkoutBankList = data.banks || [];
+
+    if (checkoutBankList.length > 0) {
+      select.innerHTML = checkoutBankList.map(b => `<option value="${b.id}">${escapeString(b.bank_name)}</option>`).join('');
+      handleCheckoutBankSelect(checkoutBankList[0].id);
+    }
+  } catch (err) {
+    console.warn('Gagal memuat rekening bank:', err);
+  }
+}
+
+function handlePaymentMethodChange() {
+  const selected = document.querySelector('input[name="checkoutPaymentMethod"]:checked')?.value || 'cod';
+  const bankSection = document.getElementById('checkoutBankSection');
+  const picSection = document.getElementById('checkoutPicSection');
+
+  if (bankSection) {
+    bankSection.style.display = (selected === 'transfer_qris' || selected === 'dp_panjar') ? 'block' : 'none';
+  }
+
+  if (picSection) {
+    picSection.style.display = (selected === 'tempo' || selected === 'dp_panjar') ? 'block' : 'none';
+  }
+}
+
+function handleCheckoutBankSelect(bankId) {
+  const bank = checkoutBankList.find(b => b.id === bankId);
+  if (!bank) return;
+
+  const nameEl = document.getElementById('selectedBankName');
+  const numEl = document.getElementById('selectedBankNumber');
+  const holderEl = document.getElementById('selectedBankHolder');
+  const qrisBox = document.getElementById('selectedQrisBox');
+  const qrisImg = document.getElementById('qrisImgPreview');
+
+  if (nameEl) nameEl.textContent = bank.bank_name;
+  if (numEl) numEl.textContent = bank.account_number;
+  if (holderEl) holderEl.textContent = bank.account_holder;
+
+  const isQris = (bank.bank_name || '').toLowerCase().includes('qris');
+  if (qrisBox) {
+    qrisBox.style.display = isQris ? 'block' : 'none';
+    if (isQris && qrisImg) {
+      qrisImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(bank.account_number)}`;
+    }
+  }
+}
+
+function copyCheckoutBankNumber() {
+  const num = document.getElementById('selectedBankNumber')?.textContent?.trim();
+  if (num) {
+    navigator.clipboard.writeText(num);
+    showToast(`✓ Nomor rekening (${num}) berhasil disalin!`);
+  }
+}
+
+// Kompresi Bukti Transfer di Sisi Klien menggunakan Canvas (Adopsi BintangCOD)
+function handlePaymentProofSelect(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  if (!file.type.startsWith('image/')) {
+    showToast('Harap pilih file gambar (JPG, PNG, WebP) untuk bukti transfer!');
+    event.target.value = '';
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const img = new Image();
+    img.onload = function() {
+      try {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        const maxDim = 1000;
+
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        uploadedPaymentProofBase64 = canvas.toDataURL('image/jpeg', 0.75);
+
+        const previewCard = document.getElementById('paymentProofPreviewCard');
+        const previewImg = document.getElementById('paymentProofPreviewImg');
+        const fileNameEl = document.getElementById('paymentProofFileName');
+
+        if (previewImg) previewImg.src = uploadedPaymentProofBase64;
+        if (fileNameEl) fileNameEl.textContent = `${file.name} (${Math.round(file.size / 1024)} KB)`;
+        if (previewCard) previewCard.style.display = 'block';
+
+        showToast('✓ Foto bukti transfer siap dilampirkan!');
+      } catch (err) {
+        uploadedPaymentProofBase64 = e.target.result;
+      }
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeUploadedPaymentProof() {
+  uploadedPaymentProofBase64 = null;
+  const fileInput = document.getElementById('inputPaymentProof');
+  if (fileInput) fileInput.value = '';
+  const previewCard = document.getElementById('paymentProofPreviewCard');
+  if (previewCard) previewCard.style.display = 'none';
+}
+
 function openCheckoutModal() {
   if (cart.length === 0) {
     showToast('Keranjang Anda masih kosong!');
     return;
   }
   toggleCartDrawer();
+  loadCheckoutBanks();
+  handlePaymentMethodChange();
   const modal = document.getElementById('checkoutModal');
   if (modal) modal.classList.add('active');
 }
@@ -439,20 +574,42 @@ async function handleCheckoutSubmit(e) {
   const phone = document.getElementById('orderPhone').value.trim();
   const address = document.getElementById('orderAddress').value.trim();
   const courier = document.getElementById('orderCourier').value;
-  const payment = document.getElementById('orderPayment').value;
+  const paymentMethod = document.querySelector('input[name="checkoutPaymentMethod"]:checked')?.value || 'cod';
   const notes = document.getElementById('orderNotes').value.trim();
 
   if (!name || !phone || !address) {
-    showToast('Harap lengkapi semua data formulir!');
+    showToast('Harap lengkapi nama, nomor WhatsApp, dan alamat pengiriman!');
     return;
   }
+
+  // Validasi khusus untuk Tempo / DP Panjar
+  let picName = '';
+  let picAddress = '';
+  if (paymentMethod === 'tempo' || paymentMethod === 'dp_panjar') {
+    picName = (document.getElementById('orderPicName')?.value || '').trim();
+    picAddress = (document.getElementById('orderPicAddress')?.value || '').trim();
+    if (!picName || !picAddress) {
+      showToast('Harap lengkapi nama & alamat Penanggung Jawab (Kadus/RT) untuk pembayaran Tempo/DP!');
+      return;
+    }
+  }
+
+  // Bank tujuan terpilih jika transfer / DP
+  const bankSelect = document.getElementById('selectCheckoutBank');
+  const selectedBankId = bankSelect ? bankSelect.value : '';
+  const selectedBank = checkoutBankList.find(b => b.id === selectedBankId);
+  const bankName = selectedBank ? selectedBank.bank_name : '';
 
   const payload = {
     customer_name: name,
     customer_phone: phone,
     customer_address: address,
     courier,
-    payment_method: payment,
+    payment_method: paymentMethod,
+    bank_name: (paymentMethod === 'transfer_qris' || paymentMethod === 'dp_panjar') ? bankName : '',
+    payment_proof_url: (paymentMethod === 'transfer_qris' || paymentMethod === 'dp_panjar') ? (uploadedPaymentProofBase64 || '') : '',
+    pic_name: picName,
+    pic_address: picAddress,
     items: cart.map(it => ({ id: it.id, qty: it.qty })),
     notes
   };
@@ -469,13 +626,11 @@ async function handleCheckoutSubmit(e) {
       cart = [];
       saveCart();
       updateCartUI();
+      removeUploadedPaymentProof();
       closeCheckoutModal();
 
-      if (payment === 'wa') {
-        window.open(result.data.whatsapp_link, '_blank');
-      } else {
-        showInvoiceModal(result.data, payment);
-      }
+      // Buka modal invoice / struk dan arahkan ke WA
+      showInvoiceModal(result.data, paymentMethod);
     } else {
       showToast('Gagal membuat pesanan: ' + result.message);
     }

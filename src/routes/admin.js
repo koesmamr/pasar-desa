@@ -401,6 +401,15 @@ router.delete('/orders/:id', requireAdmin, (req, res) => {
   }
 });
 
+router.put('/orders/:id/verify-payment', requireAdmin, (req, res) => {
+  try {
+    db.prepare('UPDATE orders SET status = "diproses" WHERE id = ?').run(req.params.id);
+    res.json({ success: true, message: 'Pembayaran berhasil diverifikasi! Status pesanan diubah ke DIPROSES.' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ==============================================================================
 // 6. PENGATURAN TOKO & DESA (WHITELABEL CONFIG)
 // ==============================================================================
@@ -429,6 +438,92 @@ router.post('/settings', requireAdmin, (req, res) => {
       }
     }
     res.json({ success: true, message: 'Pengaturan desa & BUMDes berhasil disimpan' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ==============================================================================
+// 7. MANAJEMEN REKENING BANK & QRIS BUMDES (Adopsi BintangCOD)
+// ==============================================================================
+router.get('/payment/banks', requireAdmin, (req, res) => {
+  try {
+    const banks = db.prepare('SELECT * FROM bank_accounts ORDER BY sort_order ASC, id ASC').all();
+    res.json({ success: true, banks });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/payment/banks', requireAdmin, (req, res) => {
+  try {
+    const { bank_name, account_number, account_holder, sort_order, is_active } = req.body;
+    if (!bank_name || !account_number || !account_holder) {
+      return res.status(400).json({ success: false, message: 'Semua kolom rekening bank wajib diisi' });
+    }
+
+    const id = 'bank_' + Date.now().toString().slice(-6);
+    db.prepare(`
+      INSERT INTO bank_accounts (id, bank_name, account_number, account_holder, sort_order, is_active)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(
+      id,
+      bank_name.trim(),
+      account_number.trim(),
+      account_holder.trim(),
+      parseInt(sort_order) || 0,
+      is_active !== undefined ? (is_active ? 1 : 0) : 1
+    );
+
+    res.json({ success: true, message: 'Rekening bank berhasil ditambahkan' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.put('/payment/banks/:id', requireAdmin, (req, res) => {
+  try {
+    const { bank_name, account_number, account_holder, sort_order, is_active } = req.body;
+    db.prepare(`
+      UPDATE bank_accounts SET
+        bank_name = ?,
+        account_number = ?,
+        account_holder = ?,
+        sort_order = ?,
+        is_active = ?
+      WHERE id = ?
+    `).run(
+      bank_name.trim(),
+      account_number.trim(),
+      account_holder.trim(),
+      parseInt(sort_order) || 0,
+      is_active !== undefined ? (is_active ? 1 : 0) : 1,
+      req.params.id
+    );
+
+    res.json({ success: true, message: 'Data rekening bank berhasil diperbarui' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.put('/payment/banks/:id/toggle', requireAdmin, (req, res) => {
+  try {
+    const bank = db.prepare('SELECT is_active FROM bank_accounts WHERE id = ?').get(req.params.id);
+    if (!bank) return res.status(404).json({ success: false, message: 'Rekening bank tidak ditemukan' });
+
+    const newStatus = bank.is_active === 1 ? 0 : 1;
+    db.prepare('UPDATE bank_accounts SET is_active = ? WHERE id = ?').run(newStatus, req.params.id);
+    res.json({ success: true, message: newStatus ? 'Rekening bank diaktifkan' : 'Rekening bank dinonaktifkan' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.delete('/payment/banks/:id', requireAdmin, (req, res) => {
+  try {
+    db.prepare('DELETE FROM bank_accounts WHERE id = ?').run(req.params.id);
+    res.json({ success: true, message: 'Rekening bank berhasil dihapus' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

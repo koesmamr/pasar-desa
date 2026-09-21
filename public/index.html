@@ -265,14 +265,139 @@
               <option value="Kurir Lokal BUMDes">Kurir Lokal BUMDes (Khusus Dalam Desa/Kecamatan)</option>
             </select>
           </div>
+          <!-- METODE PEMBAYARAN FLEKSIBEL (ADOPSI BINTANGCOD) -->
           <div class="form-group">
-            <label class="form-label">Metode Pembayaran</label>
-            <select id="orderPayment" class="form-control">
-              <option value="wa">📱 Pesan & Konfirmasi via WhatsApp (Paling Mudah)</option>
-              <option value="qris">⚡ QRIS BUMDes (BCA, Mandiri, BRI, GoPay, OVO, ShopeePay)</option>
-              <option value="transfer">🏦 Transfer Bank Resmi BUMDes</option>
-            </select>
+            <label class="form-label" style="font-weight: 700; color: var(--primary-brown-dark);">
+              Pilih Metode Pembayaran *
+            </label>
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 6px;">
+              
+              <label style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border: 1px solid var(--border-color); border-radius: 8px; cursor: pointer; background: #FFF;" class="pay-option">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <input type="radio" name="checkoutPaymentMethod" value="cod" checked onchange="handlePaymentMethodChange()">
+                  <div>
+                    <strong style="font-size: 13px; color: var(--primary-brown-dark);">🚚 Bayar di Tempat (COD)</strong>
+                    <div style="font-size: 11px; color: var(--text-muted);">Bayar tunai kepada kurir saat pesanan tiba di lokasi</div>
+                  </div>
+                </div>
+                <span style="font-size: 10px; font-weight: 700; background: #E8F5E9; color: #2E7D32; padding: 2px 8px; border-radius: 4px;">Paling Praktis</span>
+              </label>
+
+              <label style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border: 1px solid var(--border-color); border-radius: 8px; cursor: pointer; background: #FFF;" class="pay-option">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <input type="radio" name="checkoutPaymentMethod" value="cash" onchange="handlePaymentMethodChange()">
+                  <div>
+                    <strong style="font-size: 13px; color: var(--primary-brown-dark);">🏪 Tunai Langsung / Ambil di Kantor BUMDes</strong>
+                    <div style="font-size: 11px; color: var(--text-muted);">Bayar tunai langsung saat mengambil pesanan di gerai desa</div>
+                  </div>
+                </div>
+                <span style="font-size: 10px; font-weight: 700; background: #FFF3E0; color: #E65100; padding: 2px 8px; border-radius: 4px;">Ambil Sendiri</span>
+              </label>
+
+              <label style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border: 1px solid var(--border-color); border-radius: 8px; cursor: pointer; background: #FFF;" class="pay-option">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <input type="radio" name="checkoutPaymentMethod" value="transfer_qris" onchange="handlePaymentMethodChange()">
+                  <div>
+                    <strong style="font-size: 13px; color: var(--primary-brown-dark);">📲 Transfer Bank & QRIS Resmi</strong>
+                    <div style="font-size: 11px; color: var(--text-muted);">Bank BRI, BCA, Mandiri & QRIS Semua E-Wallet</div>
+                  </div>
+                </div>
+                <span style="font-size: 10px; font-weight: 700; background: #E3F2FD; color: #1565C0; padding: 2px 8px; border-radius: 4px;">Transfer / QRIS</span>
+              </label>
+
+              <label style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border: 1px solid var(--border-color); border-radius: 8px; cursor: pointer; background: #FFF;" class="pay-option">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <input type="radio" name="checkoutPaymentMethod" value="tempo" onchange="handlePaymentMethodChange()">
+                  <div>
+                    <strong style="font-size: 13px; color: var(--primary-brown-dark);">⏳ Cash Tunda / Tempo 3 Hari</strong>
+                    <div style="font-size: 11px; color: var(--text-muted);">Khusus mitra UMKM / warga binaan (Jatuh tempo H+3)</div>
+                  </div>
+                </div>
+                <span style="font-size: 10px; font-weight: 700; background: #EDE7F6; color: #512DA8; padding: 2px 8px; border-radius: 4px;">Tempo H+3</span>
+              </label>
+
+              <label style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border: 1px solid var(--border-color); border-radius: 8px; cursor: pointer; background: #FFF;" class="pay-option">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <input type="radio" name="checkoutPaymentMethod" value="dp_panjar" onchange="handlePaymentMethodChange()">
+                  <div>
+                    <strong style="font-size: 13px; color: var(--primary-brown-dark);">💵 DP / Panjar (Uang Muka 30%)</strong>
+                    <div style="font-size: 11px; color: var(--text-muted);">Uang muka 30%, sisa dilunasi saat barang tiba</div>
+                  </div>
+                </div>
+                <span style="font-size: 10px; font-weight: 700; background: #E0F2F1; color: #00796B; padding: 2px 8px; border-radius: 4px;">DP 30%</span>
+              </label>
+
+            </div>
           </div>
+
+          <!-- BOX PILIHAN REKENING BANK & QRIS (MUNCUL JIKA TRANSFER / DP) -->
+          <div id="checkoutBankSection" style="display: none; background: #FAF6EE; border: 1px solid var(--border-color); border-radius: 10px; padding: 14px; margin-bottom: 16px;">
+            <label class="form-label" style="font-weight: 700;">Tujuan Transfer Bank / QRIS BUMDes *</label>
+            <select id="selectCheckoutBank" onchange="handleCheckoutBankSelect(this.value)" class="form-control" style="font-weight: 600;"></select>
+
+            <!-- Card Info Rekening Terpilih dengan Tombol Salin -->
+            <div id="selectedBankCard" style="background: #FFF; border: 1px solid #C5E1A5; border-radius: 8px; padding: 12px; margin-top: 10px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                <strong id="selectedBankName" style="color: var(--primary-brown-dark); font-size: 13px;">Bank BRI</strong>
+                <button type="button" onclick="copyCheckoutBankNumber()" style="background: var(--terracotta); color: #FFF; border: none; border-radius: 4px; padding: 3px 8px; font-size: 11px; font-weight: 600; cursor: pointer;">
+                  📋 Salin No. Rek
+                </button>
+              </div>
+              <div style="font-size: 15px; font-weight: 800; color: #1B5E20; font-family: monospace;" id="selectedBankNumber">
+                0123-01-000456-50-8
+              </div>
+              <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+                a.n. <span id="selectedBankHolder" style="font-weight: 600; color: #333;">BUMDES BERKAH MANDIRI</span>
+              </div>
+              <!-- QRIS Image Box -->
+              <div id="selectedQrisBox" style="display: none; text-align: center; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #DDD;">
+                <p style="font-size: 11px; font-weight: 600; margin-bottom: 6px;">Pindai QRIS Resmi di Bawah Ini:</p>
+                <img id="qrisImgPreview" src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=QRIS-PASARDESA" style="width: 160px; height: 160px; border-radius: 8px; border: 2px solid #DDD;" alt="QRIS BUMDes">
+                <p style="font-size: 10px; color: #666; margin-top: 4px;">Mendukung BCA, BRI, Mandiri, GoPay, OVO, ShopeePay, Dana, LinkAja</p>
+              </div>
+            </div>
+
+            <!-- UNGGAH BUKTI TRANSFER DENGAN LIVE PREVIEW (ALA BINTANGCOD) -->
+            <div style="margin-top: 12px; padding-top: 12px; border-top: 1px dashed #DDD;">
+              <label class="form-label" style="display: flex; justify-content: space-between; align-items: center; font-weight: 700;">
+                <span>Lampirkan Foto Bukti Transfer / Resi</span>
+                <span style="font-size: 10px; color: #C62828; font-weight: bold;">(Opsional tapi Disarankan)</span>
+              </label>
+              <input type="file" id="inputPaymentProof" accept="image/*" onchange="handlePaymentProofSelect(event)" class="form-control" style="padding: 6px; font-size: 12px;">
+
+              <!-- Live Preview Bukti Transfer -->
+              <div id="paymentProofPreviewCard" style="display: none; background: #FFF; border: 2px solid #2E7D32; border-radius: 8px; padding: 10px; margin-top: 8px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                  <span style="font-size: 11px; font-weight: 700; color: #2E7D32;">✓ Foto Bukti Siap Dilampirkan</span>
+                  <button type="button" onclick="removeUploadedPaymentProof()" style="background: none; color: #C62828; font-size: 11px; font-weight: bold; cursor: pointer; text-decoration: underline;">
+                    Hapus / Ganti
+                  </button>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <img id="paymentProofPreviewImg" src="" style="width: 50px; height: 50px; object-fit: cover; border-radius: 6px; border: 1px solid #DDD;" alt="Bukti Transfer">
+                  <div style="font-size: 11px; overflow: hidden;">
+                    <div id="paymentProofFileName" style="font-weight: 600; text-overflow: ellipsis; white-space: nowrap; max-width: 180px;">bukti.jpg</div>
+                    <div style="color: #2E7D32; font-size: 10px;">Siap dikirim bersama pesanan ✓</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- BOX PENANGGUNG JAWAB AREA (MUNCUL JIKA TEMPO / DP) -->
+          <div id="checkoutPicSection" style="display: none; background: #FFF8E1; border: 1px solid #FFE082; border-radius: 10px; padding: 14px; margin-bottom: 16px;">
+            <div style="font-size: 13px; font-weight: 700; color: #F57F17; margin-bottom: 4px;">📋 Penanggung Jawab Area (Wajib untuk Tempo / DP)</div>
+            <p style="font-size: 11px; color: #795548; margin-bottom: 10px;">Mohon isi data Kepala Dusun / RT / Penanggung Jawab untuk verifikasi pencatatan BUMDes.</p>
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label class="form-label" style="font-size: 12px;">Nama Lengkap PIC / Kepala Dusun *</label>
+              <input type="text" id="orderPicName" class="form-control" placeholder="Contoh: Bpk. Rusli (Kepala Dusun II)">
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label" style="font-size: 12px;">Alamat / Wilayah PIC *</label>
+              <input type="text" id="orderPicAddress" class="form-control" placeholder="Contoh: Dusun II, samping kantor desa">
+            </div>
+          </div>
+
           <div class="form-group">
             <label class="form-label">Catatan Tambahan (Opsional)</label>
             <input type="text" id="orderNotes" class="form-control" placeholder="Contoh: Titipkan di pos satpam / packing kayu">

@@ -243,7 +243,17 @@ router.get('/stories', (req, res) => {
   }
 });
 
-// Buat Pesanan Baru (Checkout)
+// Ambil Rekening Bank & QRIS Aktif (Adopsi BintangCOD)
+router.get('/payment/banks', (req, res) => {
+  try {
+    const banks = db.prepare('SELECT * FROM bank_accounts WHERE is_active = 1 ORDER BY sort_order ASC, id ASC').all();
+    res.json({ success: true, banks });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Buat Pesanan Baru (Checkout) - Sistem Pembayaran Fleksibel ala BintangCOD
 router.post('/orders', (req, res) => {
   try {
     const {
@@ -252,6 +262,10 @@ router.post('/orders', (req, res) => {
       customer_address,
       courier,
       payment_method,
+      bank_name,
+      payment_proof_url,
+      pic_name,
+      pic_address,
       items,
       notes
     } = req.body;
@@ -293,11 +307,30 @@ router.post('/orders', (req, res) => {
     const randomSuffix = Math.floor(1000 + Math.random() * 9000);
     const order_code = `PSD-${Date.now().toString().slice(-4)}${randomSuffix}`;
 
+    // Perhitungan Khusus Metode Pembayaran (Adopsi BintangCOD)
+    const method = payment_method || 'cod';
+    let dp_amount = 0;
+    let due_date = '';
+
+    if (method === 'dp_panjar') {
+      dp_amount = Math.round(total_amount * 0.3); // Minimum DP 30%
+    } else if (method === 'tempo') {
+      const d = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000); // Jatuh tempo H+3
+      due_date = d.toISOString().split('T')[0];
+    }
+
+    // Status pesanan awal
+    let initialStatus = 'pending';
+    if (payment_proof_url) {
+      initialStatus = 'diproses'; // Otomatis diproses jika bukti bayar dilampirkan
+    }
+
     const stmt = db.prepare(`
       INSERT INTO orders (
         order_code, customer_name, customer_email, customer_phone, customer_address,
-        courier, payment_method, total_amount, pad_amount, status, items_json, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+        courier, payment_method, bank_name, payment_proof_url, pic_name, pic_address,
+        dp_amount, due_date, total_amount, pad_amount, status, items_json, notes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
@@ -307,9 +340,16 @@ router.post('/orders', (req, res) => {
       customer_phone,
       customer_address,
       courier || 'Kurir BUMDes / JNE',
-      payment_method || 'qris',
+      method,
+      bank_name || '',
+      payment_proof_url || '',
+      pic_name || '',
+      pic_address || '',
+      dp_amount,
+      due_date,
       total_amount,
       pad_amount,
+      initialStatus,
       JSON.stringify(validatedItems),
       notes || ''
     );
@@ -322,23 +362,49 @@ router.post('/orders', (req, res) => {
     const bumdesName = bumdesRow?.value || 'BUMDes Pasar Desa';
     const desaName = desaRow?.value || 'Desa Nusantara';
 
-    let waText = `Halo Admin *${bumdesName}* (${desaName}),\nSaya ingin memesan produk Pasar Desa:\n\n`;
-    waText += `📋 *Invoice:* #${order_code}\n`;
-    waText += `👤 *Nama:* ${customer_name}\n`;
-    waText += `📱 *No HP:* ${customer_phone}\n`;
-    waText += `📍 *Alamat:* ${customer_address}\n`;
-    waText += `🚚 *Pengiriman:* ${courier || 'Kurir BUMDes'}\n`;
-    waText += `💳 *Metode Bayar:* ${payment_method === 'wa' ? 'Konfirmasi via WA' : payment_method.toUpperCase()}\n\n`;
-    waText += `🛍️ *Rincian Pesanan:*\n`;
+    // Label Metode Pembayaran Human-Readable (Adopsi BintangCOD)
+    const paymentLabels = {
+      cod: '🚚 Bayar di Tempat (COD)',
+      cash: '🏪 Tunai (Ambil di Toko / Kantor BUMDes)',
+      transfer_qris: '📲 Transfer Bank & QRIS',
+      tempo: '⏳ Cash Tunda / Tempo 3 Hari',
+      dp_panjar: `💵 DP / Panjar 30% (DP: Rp ${dp_amount.toLocaleString('id-ID')})`,
+      wa: '📱 Konfirmasi via WhatsApp'
+    };
+    const payLabel = paymentLabels[method] || method.toUpperCase();
 
+    let waText = `Halo Admin *${bumdesName}* (${desaName}),\nSaya ingin mengonfirmasi pesanan produk Pasar Desa:\n\n`;
+    waText += `📋 *Invoice:* #${order_code}\n`;
+    waText += `👤 *Nama Pembeli:* ${customer_name}\n`;
+    waText += `📱 *No HP/WA:* ${customer_phone}\n`;
+    waText += `📍 *Alamat Pengantaran:* ${customer_address}\n`;
+    waText += `🚚 *Pilihan Kurir:* ${courier || 'Kurir BUMDes'}\n`;
+    waText += `💳 *Metode Pembayaran:* ${payLabel}\n`;
+
+    if (bank_name && (method === 'transfer_qris' || method === 'dp_panjar')) {
+      waText += `🏦 *Rekening Tujuan:* ${bank_name}\n`;
+    }
+    if (payment_proof_url) {
+      waText += `🧾 *Bukti Bayar:* Terlampir di Sistem ✓\n`;
+    }
+    if (pic_name && (method === 'tempo' || method === 'dp_panjar')) {
+      waText += `📋 *Penanggung Jawab (PIC):* ${pic_name} (${pic_address || '-'})\n`;
+      if (due_date) waText += `📅 *Jatuh Tempo:* ${due_date}\n`;
+    }
+
+    waText += `\n🛍️ *Rincian Pesanan:*\n`;
     validatedItems.forEach((it, idx) => {
       waText += `${idx + 1}. ${it.name} (${it.qty}x) - Rp ${(it.subtotal).toLocaleString('id-ID')}\n`;
     });
 
     waText += `\n💰 *Total Pembayaran:* Rp ${total_amount.toLocaleString('id-ID')}\n`;
+    if (method === 'dp_panjar') {
+      waText += `💵 *Uang Muka (DP 30%):* Rp ${dp_amount.toLocaleString('id-ID')}\n`;
+      waText += `⏳ *Sisa Tagihan Pelunasan:* Rp ${(total_amount - dp_amount).toLocaleString('id-ID')}\n`;
+    }
     waText += `🌱 *Kontribusi Kas PAD Desa (${padPercent}%):* Rp ${pad_amount.toLocaleString('id-ID')}\n`;
     if (notes) waText += `📝 *Catatan:* ${notes}\n`;
-    waText += `\nMohon konfirmasi pesanan saya. Terima kasih!`;
+    waText += `\nMohon pesanan segera diproses. Terima kasih!`;
 
     const waLink = `https://wa.me/${targetWa}?text=${encodeURIComponent(waText)}`;
 
@@ -349,7 +415,12 @@ router.post('/orders', (req, res) => {
         order_code,
         customer_name,
         total_amount,
+        dp_amount,
+        due_date,
         pad_amount,
+        payment_method: method,
+        bank_name,
+        payment_proof_url,
         items: validatedItems,
         whatsapp_link: waLink
       }
