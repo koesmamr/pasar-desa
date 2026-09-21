@@ -251,6 +251,15 @@
         box-shadow: none !important;
       }
     }
+
+    @keyframes spinAnim {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    .spin-anim {
+      display: inline-block;
+      animation: spinAnim 0.6s linear;
+    }
   </style>
 </head>
 <body>
@@ -315,25 +324,25 @@
       </div>
 
       <ul class="admin-nav">
-        <li class="admin-nav-item active" onclick="switchAdminTab('dashboard', this)">
+        <li class="admin-nav-item active" data-tab="dashboard" onclick="switchAdminTab('dashboard', this)">
           <span>📊</span> Dashboard & PAD
         </li>
-        <li class="admin-nav-item" onclick="switchAdminTab('products', this)">
+        <li class="admin-nav-item" data-tab="products" onclick="switchAdminTab('products', this)">
           <span>🛍️</span> Katalog Produk
         </li>
-        <li class="admin-nav-item" onclick="switchAdminTab('categories', this)">
+        <li class="admin-nav-item" data-tab="categories" onclick="switchAdminTab('categories', this)">
           <span>🏷️</span> Kategori Produk
         </li>
-        <li class="admin-nav-item" onclick="switchAdminTab('orders', this)">
+        <li class="admin-nav-item" data-tab="orders" onclick="switchAdminTab('orders', this)">
           <span>📦</span> Pesanan Pelanggan
         </li>
-        <li class="admin-nav-item" onclick="switchAdminTab('users', this)">
+        <li class="admin-nav-item" data-tab="users" onclick="switchAdminTab('users', this)">
           <span>👥</span> Manajemen Pengguna
         </li>
-        <li class="admin-nav-item" onclick="switchAdminTab('banks', this)">
+        <li class="admin-nav-item" data-tab="banks" onclick="switchAdminTab('banks', this)">
           <span>💳</span> Rekening & QRIS
         </li>
-        <li class="admin-nav-item" onclick="switchAdminTab('settings', this)">
+        <li class="admin-nav-item" data-tab="settings" onclick="switchAdminTab('settings', this)">
           <span>⚙️</span> Pengaturan Toko & Desa
         </li>
         <li class="admin-nav-item" style="margin-top: 30px; color: #FFCDD2;" onclick="adminLogout()">
@@ -354,7 +363,10 @@
             Pantau kinerja penjualan toko dan pendapatan asli desa (PAD) secara realtime
           </p>
         </div>
-        <div style="display: flex; align-items: center; gap: 14px;">
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+          <button onclick="refreshCurrentTab()" id="btnRefreshAdmin" class="btn-secondary" style="font-size: 13px; padding: 8px 14px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; border-radius: 6px;" title="Muat ulang data terbaru (Bisa juga tekan F5 di keyboard)">
+            <span id="refreshIcon">🔄</span> <span id="refreshLabel">Segarkan (F5)</span>
+          </button>
           <div id="adminProfileHeader" style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600;"></div>
           <a href="/" target="_blank" class="btn-secondary" style="font-size: 13px; padding: 8px 16px;">
             🌐 Buka Toko Online
@@ -385,7 +397,10 @@
 
         <div class="data-table-card">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-            <h3 style="font-size: 16px; font-weight: 700; color: var(--primary-brown-dark);">Pesanan Masuk Terbaru</h3>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <h3 style="font-size: 16px; font-weight: 700; color: var(--primary-brown-dark);">Pesanan Masuk Terbaru</h3>
+              <button onclick="refreshCurrentTab()" class="btn-secondary" style="font-size: 12px; padding: 4px 10px; cursor: pointer;" title="Segarkan Data (F5)">🔄 Refresh</button>
+            </div>
             <button onclick="switchAdminTab('orders', document.querySelectorAll('.admin-nav-item')[3])" style="background: none; color: var(--terracotta); font-size: 12px; font-weight: 600;">Lihat Semua &rarr;</button>
           </div>
           <table class="data-table">
@@ -414,7 +429,10 @@
                 <option value="">Semua Kategori</option>
               </select>
             </div>
-            <button class="btn-primary" onclick="openProductModal()">+ Upload Produk Baru</button>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn-secondary" onclick="refreshCurrentTab()" style="font-size: 13px; padding: 7px 12px; cursor: pointer;" title="Segarkan Data (F5)">🔄 Refresh</button>
+              <button class="btn-primary" onclick="openProductModal()">+ Upload Produk Baru</button>
+            </div>
           </div>
           <table class="data-table">
             <thead>
@@ -440,7 +458,10 @@
         <div class="data-table-card" style="max-width: 800px;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
             <h3 style="font-size: 16px; font-weight: 700; color: var(--primary-brown-dark);">Daftar Kategori Produk</h3>
-            <button class="btn-primary" onclick="openCategoryModal()">+ Tambah Kategori</button>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn-secondary" onclick="refreshCurrentTab()" style="font-size: 13px; padding: 7px 12px; cursor: pointer;" title="Segarkan Data (F5)">🔄 Refresh</button>
+              <button class="btn-primary" onclick="openCategoryModal()">+ Tambah Kategori</button>
+            </div>
           </div>
           <table class="data-table">
             <thead>
@@ -472,6 +493,7 @@
                 <option value="selesai">Selesai</option>
                 <option value="batal">Dibatalkan</option>
               </select>
+              <button class="btn-secondary" onclick="refreshCurrentTab()" style="font-size: 13px; padding: 7px 12px; cursor: pointer;" title="Segarkan Data (F5)">🔄 Refresh</button>
             </div>
           </div>
           <table class="data-table">
@@ -500,7 +522,10 @@
               <h3 style="font-size: 16px; font-weight: 700; color: var(--primary-brown-dark);">Daftar Pengguna Google SSO</h3>
               <p style="font-size: 12px; color: var(--text-muted);">Kelola hak akses administrator dan kontrol pemblokiran akun pengguna</p>
             </div>
-            <input type="text" id="searchUserInput" oninput="filterUsersTable()" placeholder="Cari nama / email..." class="form-control" style="width: 220px; padding: 7px 12px; font-size: 13px;">
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <input type="text" id="searchUserInput" oninput="filterUsersTable()" placeholder="Cari nama / email..." class="form-control" style="width: 220px; padding: 7px 12px; font-size: 13px;">
+              <button class="btn-secondary" onclick="refreshCurrentTab()" style="font-size: 13px; padding: 7px 12px; cursor: pointer;" title="Segarkan Data (F5)">🔄 Refresh</button>
+            </div>
           </div>
           <table class="data-table">
             <thead>
@@ -579,7 +604,10 @@
               <h3 style="font-size: 16px; font-weight: 700; color: var(--primary-brown-dark);">Rekening Bank & QRIS Resmi BUMDes</h3>
               <p style="font-size: 12px; color: var(--text-muted);">Kelola nomor rekening dan QRIS yang tampil saat checkout pelanggan</p>
             </div>
-            <button class="btn-primary" onclick="openBankModal()">+ Tambah Rekening / QRIS</button>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn-secondary" onclick="refreshCurrentTab()" style="font-size: 13px; padding: 7px 12px; cursor: pointer;" title="Segarkan Data (F5)">🔄 Refresh</button>
+              <button class="btn-primary" onclick="openBankModal()">+ Tambah Rekening / QRIS</button>
+            </div>
           </div>
           <table class="data-table">
             <thead>

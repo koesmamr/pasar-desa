@@ -13,6 +13,15 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function initApp() {
+  // Pulihkan kategori dari URL Hash (#kategori-...) atau localStorage saat F5
+  const hash = window.location.hash || '';
+  if (hash.startsWith('#kategori-')) {
+    currentCategory = hash.replace('#kategori-', '').trim();
+  } else {
+    const savedCat = localStorage.getItem('pasardesa_category');
+    if (savedCat) currentCategory = savedCat;
+  }
+
   await loadConfig();
   await checkUserAuth();
   await loadCategories();
@@ -152,14 +161,14 @@ function renderCategoryPills(categories) {
   if (!container) return;
 
   let html = `
-    <button class="category-pill ${currentCategory === 'semua' ? 'active' : ''}" onclick="filterCategory('semua', this)">
+    <button class="category-pill ${currentCategory === 'semua' ? 'active' : ''}" data-category="semua" onclick="filterCategory('semua', this)">
       <span>🌟</span> Semua Produk
     </button>
   `;
 
   categories.forEach(c => {
     html += `
-      <button class="category-pill ${currentCategory === c.slug ? 'active' : ''}" onclick="filterCategory('${c.slug}', this)">
+      <button class="category-pill ${currentCategory === c.slug ? 'active' : ''}" data-category="${c.slug}" onclick="filterCategory('${c.slug}', this)">
         <span>${c.icon || '📦'}</span> ${c.name}
       </button>
     `;
@@ -275,8 +284,21 @@ async function loadStories() {
 
 function filterCategory(slug, btn) {
   currentCategory = slug;
+  localStorage.setItem('pasardesa_category', slug);
+
+  if (slug !== 'semua') {
+    history.replaceState(null, '', '#kategori-' + slug);
+  } else {
+    history.replaceState(null, '', window.location.pathname);
+  }
+
   document.querySelectorAll('.category-pill').forEach(el => el.classList.remove('active'));
-  if (btn) btn.classList.add('active');
+  if (btn) {
+    btn.classList.add('active');
+  } else {
+    const matched = document.querySelector(`.category-pill[data-category="${slug}"]`);
+    if (matched) matched.classList.add('active');
+  }
   loadProducts();
 }
 
@@ -303,6 +325,21 @@ function setupEventListeners() {
 
   const checkoutForm = document.getElementById('checkoutForm');
   if (checkoutForm) checkoutForm.addEventListener('submit', handleCheckoutSubmit);
+
+  // Listener Hashchange untuk Navigasi & F5 di Etalase
+  window.addEventListener('hashchange', () => {
+    const hash = window.location.hash || '';
+    if (hash.startsWith('#kategori-')) {
+      const slug = hash.replace('#kategori-', '').trim();
+      if (slug && slug !== currentCategory) {
+        filterCategory(slug);
+      }
+    } else if (!hash || hash === '#semua' || hash === '#produk') {
+      if (currentCategory !== 'semua') {
+        filterCategory('semua');
+      }
+    }
+  });
 }
 
 // ==========================================================================

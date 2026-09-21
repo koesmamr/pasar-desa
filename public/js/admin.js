@@ -92,7 +92,14 @@ function showAdminPanel() {
   }
 
   loadCategoriesDropdown();
-  loadStats();
+
+  // Dukungan Refresh F5: Baca tab dari URL Hash (misal #banks, #products) atau localStorage
+  const validTabs = ['dashboard', 'products', 'categories', 'orders', 'users', 'banks', 'settings'];
+  const hashTab = (window.location.hash || '').replace('#', '').trim();
+  const savedTab = localStorage.getItem('admin_active_tab');
+  const targetTab = validTabs.includes(hashTab) ? hashTab : (validTabs.includes(savedTab) ? savedTab : 'dashboard');
+
+  switchAdminTab(targetTab);
 }
 
 // 4. EVENT LISTENERS
@@ -149,6 +156,15 @@ function setupEventListeners() {
   if (filterCat) {
     filterCat.addEventListener('change', renderFilteredProducts);
   }
+
+  // Listener Hashchange untuk Navigasi & F5
+  window.addEventListener('hashchange', () => {
+    const validTabs = ['dashboard', 'products', 'categories', 'orders', 'users', 'banks', 'settings'];
+    const hashTab = (window.location.hash || '').replace('#', '').trim();
+    if (validTabs.includes(hashTab) && hashTab !== currentTab) {
+      switchAdminTab(hashTab);
+    }
+  });
 }
 
 // Preview & Konversi File Foto Produk ke Base64
@@ -194,8 +210,21 @@ function resetImagePreview() {
 // 5. PERGANTIAN TAB (TAB SWITCHING)
 function switchAdminTab(tab, el) {
   currentTab = tab;
+
+  // Simpan state URL hash dan localStorage agar saat refresh F5 tetap di tab yang sama
+  if (window.location.hash !== '#' + tab) {
+    history.replaceState(null, '', '#' + tab);
+  }
+  localStorage.setItem('admin_active_tab', tab);
+
+  // Update active status di sidebar nav
   document.querySelectorAll('.admin-nav-item').forEach(i => i.classList.remove('active'));
-  if (el) el.classList.add('active');
+  if (el) {
+    el.classList.add('active');
+  } else {
+    const matchedEl = document.querySelector(`.admin-nav-item[data-tab="${tab}"]`);
+    if (matchedEl) matchedEl.classList.add('active');
+  }
 
   document.getElementById('tabDashboard').style.display = tab === 'dashboard' ? 'block' : 'none';
   document.getElementById('tabProducts').style.display = tab === 'products' ? 'block' : 'none';
@@ -236,6 +265,22 @@ function switchAdminTab(tab, el) {
   if (tab === 'users') loadUsersTable();
   if (tab === 'banks') loadBanksTable();
   if (tab === 'settings') loadSettings();
+}
+
+// 6. REFRESH DATA TAB AKTIF (F5 DUKUNGAN)
+function refreshCurrentTab() {
+  const icon = document.getElementById('refreshIcon');
+  const label = document.getElementById('refreshLabel');
+  if (icon) icon.classList.add('spin-anim');
+  if (label) label.textContent = 'Memuat...';
+
+  loadCategoriesDropdown();
+  switchAdminTab(currentTab);
+
+  setTimeout(() => {
+    if (icon) icon.classList.remove('spin-anim');
+    if (label) label.textContent = 'Segarkan (F5)';
+  }, 600);
 }
 
 // ==============================================================================
