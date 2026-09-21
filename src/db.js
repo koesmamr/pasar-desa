@@ -47,37 +47,46 @@ class DBWrapper {
 
   prepare(sql) {
     if (this.rawDb) {
-      const stmt = this.rawDb.prepare(sql);
-      return {
-        get(...params) {
-          try {
-            return stmt.get(...params);
-          } catch (err) {
-            console.error('[DB Error get]', sql, err);
-            return null;
+      try {
+        const stmt = this.rawDb.prepare(sql);
+        return {
+          get(...params) {
+            try {
+              return stmt.get(...params);
+            } catch (err) {
+              console.error('[DB Error get]', sql, err);
+              return null;
+            }
+          },
+          all(...params) {
+            try {
+              return stmt.all(...params) || [];
+            } catch (err) {
+              console.error('[DB Error all]', sql, err);
+              return [];
+            }
+          },
+          run(...params) {
+            try {
+              const res = stmt.run(...params);
+              return {
+                changes: res?.changes || 0,
+                lastInsertRowid: res?.lastInsertRowid !== undefined ? Number(res.lastInsertRowid) : 0
+              };
+            } catch (err) {
+              console.error('[DB Error run]', sql, err);
+              throw err;
+            }
           }
-        },
-        all(...params) {
-          try {
-            return stmt.all(...params) || [];
-          } catch (err) {
-            console.error('[DB Error all]', sql, err);
-            return [];
-          }
-        },
-        run(...params) {
-          try {
-            const res = stmt.run(...params);
-            return {
-              changes: res?.changes || 0,
-              lastInsertRowid: res?.lastInsertRowid !== undefined ? Number(res.lastInsertRowid) : 0
-            };
-          } catch (err) {
-            console.error('[DB Error run]', sql, err);
-            throw err;
-          }
-        }
-      };
+        };
+      } catch (err) {
+        console.error('[DB Error prepare]', sql, err);
+        return {
+          get: () => null,
+          all: () => [],
+          run: () => ({ changes: 0, lastInsertRowid: 0 })
+        };
+      }
     }
 
     return {
@@ -197,6 +206,8 @@ function initDatabase() {
     try { db.exec('ALTER TABLE orders ADD COLUMN pic_address TEXT DEFAULT "";'); } catch (e) {}
     try { db.exec('ALTER TABLE orders ADD COLUMN dp_amount INTEGER DEFAULT 0;'); } catch (e) {}
     try { db.exec('ALTER TABLE orders ADD COLUMN due_date TEXT DEFAULT "";'); } catch (e) {}
+    try { db.exec('ALTER TABLE orders ADD COLUMN pad_amount INTEGER DEFAULT 0;'); } catch (e) {}
+    try { db.exec('ALTER TABLE orders ADD COLUMN total_amount INTEGER DEFAULT 0;'); } catch (e) {}
   }
 
   seedDefaults();

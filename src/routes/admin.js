@@ -61,7 +61,7 @@ router.get('/stats', requireAdmin, (req, res) => {
     const totalOrders = db.prepare('SELECT COUNT(*) as count FROM orders').get()?.count || 0;
     const totalUsers = db.prepare('SELECT COUNT(*) as count FROM users').get()?.count || 0;
     const totalCategories = db.prepare('SELECT COUNT(*) as count FROM categories').get()?.count || 0;
-    const pendingOrders = db.prepare('SELECT COUNT(*) as count FROM orders WHERE status = "pending"').get()?.count || 0;
+    const pendingOrders = db.prepare("SELECT COUNT(*) as count FROM orders WHERE status = 'pending'").get()?.count || 0;
 
     const finance = db.prepare(`
       SELECT 
@@ -72,7 +72,7 @@ router.get('/stats', requireAdmin, (req, res) => {
 
     const recentOrders = db.prepare(`
       SELECT * FROM orders ORDER BY id DESC LIMIT 6
-    `).all();
+    `).all() || [];
 
     res.json({
       success: true,
@@ -86,13 +86,14 @@ router.get('/stats', requireAdmin, (req, res) => {
         total_pad: finance?.total_pad || 0,
         recent_orders: recentOrders,
         admin_user: {
-          name: req.adminUser.name,
-          email: req.adminUser.email,
-          picture: req.adminUser.picture
+          name: req.adminUser?.name || 'Admin BUMDes',
+          email: req.adminUser?.email || '',
+          picture: req.adminUser?.picture || ''
         }
       }
     });
   } catch (err) {
+    console.error('[Admin Stats Error]', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
