@@ -1,4 +1,4 @@
-﻿/* ==========================================================================
+/* ==========================================================================
    PASAR DESA NUSANTARA - DESIGN SYSTEM
    Warna Utama: Earthy Terracotta, Warm Cream, Forest Green, Ivory
    ========================================================================== */
@@ -955,37 +955,383 @@ img {
   opacity: 1;
 }
 
-/* Responsive */
+/* ==========================================================================
+   RESPONSIVE DESIGN (PERSIS SEPERTI SHOPEE PADA HP)
+   - 2 Barang per baris di HP
+   - Pas di layar HP (no horizontal scroll / tidak geser kanan kiri)
+   - Rasio gambar 1:1 kotak khas Shopee
+   ========================================================================== */
+
+/* Pastikan tidak ada horizontal scroll di seluruh halaman */
+html, body {
+  max-width: 100vw;
+  overflow-x: hidden;
+  position: relative;
+}
+
 @media (max-width: 1024px) {
   .products-grid {
     grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
   }
 }
+
 @media (max-width: 768px) {
-  .products-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 14px;
+  /* Container pas layar HP */
+  .container {
+    padding: 0 10px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
   }
-  .hero-title {
-    font-size: 28px;
+
+  /* Header & Navbar HP */
+  .header-top {
+    display: none; /* Sembunyikan topbar kecil di HP agar ringkas */
   }
-  .stories-grid {
-    grid-template-columns: 1fr;
+  .main-navbar {
+    padding: 8px 0;
   }
-  .pad-impact-card {
-    flex-direction: column;
-    text-align: center;
-    gap: 20px;
+  .navbar-wrapper {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+  .brand-logo {
+    gap: 8px;
+  }
+  .brand-icon {
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+    border-radius: 8px;
+  }
+  .brand-text h1 {
+    font-size: 14px;
+  }
+  .brand-text span {
+    font-size: 9px;
   }
   .nav-links {
     display: none;
   }
+  .nav-actions {
+    margin-left: auto;
+  }
+  .btn-cart-nav {
+    width: 38px;
+    height: 38px;
+    font-size: 16px;
+  }
+  .search-box {
+    width: 100%;
+    min-width: 100%;
+    order: 3;
+    margin-top: 4px;
+  }
+  .search-box input {
+    padding: 8px 14px 8px 34px;
+    font-size: 12px;
+  }
+
+  /* Hero Section HP */
+  .hero-section {
+    padding: 24px 0 32px;
+  }
+  .hero-emblem {
+    font-size: 11px;
+    padding: 4px 12px;
+    margin-bottom: 10px;
+  }
+  .hero-title {
+    font-size: 22px;
+    margin-bottom: 8px;
+  }
+  .hero-subtitle {
+    font-size: 12px;
+    margin-bottom: 16px;
+    line-height: 1.4;
+  }
+  .hero-badges {
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+  .hero-badge-item {
+    font-size: 11px;
+    padding: 4px 10px;
+  }
+  .hero-cta {
+    gap: 8px;
+  }
+  .btn-primary, .btn-secondary {
+    padding: 9px 16px;
+    font-size: 12px;
+  }
+
+  /* Kategori Scroll HP */
+  .category-bar-section {
+    margin-top: -16px;
+    margin-bottom: 18px;
+  }
+  .category-pill {
+    padding: 6px 14px;
+    font-size: 12px;
+    border-radius: var(--radius-full);
+  }
+
+  /* Section Title HP */
+  .section-title-wrap {
+    margin-bottom: 14px;
+  }
+  .section-title {
+    font-size: 18px;
+    margin-bottom: 4px;
+  }
+  .section-desc {
+    font-size: 12px;
+  }
+
+  /* ========================================================================
+     GRID PRODUK HP (2 BARANG PER BARIS, PERSIS SHOPEE)
+     ======================================================================== */
+  .products-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important; /* 2 BARANG PER BARIS */
+    gap: 8px !important;
+    margin-bottom: 30px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .product-card {
+    border-radius: 8px;
+    border: 1px solid #ECE4DA;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+    background: #FFFFFF;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Gambar Kotak Rasio 1:1 Persis Shopee */
+  .product-thumb {
+    position: relative;
+    width: 100%;
+    padding-top: 100% !important; /* Rasio 1:1 Kotak Shopee */
+    overflow: hidden;
+  }
+  .product-thumb img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  /* Badge Produk Compact */
+  .badge-village {
+    top: 5px;
+    left: 5px;
+    font-size: 9px;
+    font-weight: 600;
+    padding: 2px 5px;
+    border-radius: 4px;
+    max-width: 75%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .badge-pad-cut {
+    top: 5px;
+    right: 5px;
+    font-size: 9px;
+    padding: 2px 5px;
+    border-radius: 4px;
+  }
+
+  /* Body Kartu Produk */
+  .product-body {
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+  }
+  .product-category {
+    font-size: 9px;
+    margin-bottom: 2px;
+  }
+  .product-name {
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.35;
+    margin-bottom: 3px;
+    height: 2.7em;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .product-maker {
+    font-size: 10px;
+    margin-bottom: 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .product-price-wrap {
+    margin-top: auto;
+    margin-bottom: 6px;
+  }
+  .product-price {
+    font-size: 14px;
+    font-weight: 800;
+    color: var(--primary-brown-dark);
+    display: block;
+    line-height: 1.2;
+  }
+  .product-original-price {
+    font-size: 10px;
+    display: block;
+    margin-left: 0;
+    color: #999;
+  }
+
+  /* Tombol Aksi Compact HP */
+  .btn-add-cart {
+    padding: 6px 4px;
+    font-size: 11px;
+    font-weight: 700;
+    border-radius: 5px;
+    gap: 4px;
+  }
+  .btn-buy-wa {
+    padding: 5px 4px;
+    font-size: 10px;
+    border-radius: 5px;
+    gap: 4px;
+    margin-top: 4px;
+  }
+
+  /* PAD Banner HP */
+  .pad-impact-card {
+    flex-direction: column;
+    text-align: center;
+    padding: 18px 14px;
+    gap: 14px;
+    border-radius: 12px;
+    margin-bottom: 28px;
+  }
+  .pad-impact-left h2 {
+    font-size: 16px;
+  }
+  .pad-impact-left p {
+    font-size: 12px;
+    line-height: 1.4;
+  }
+  .pad-stats-row {
+    gap: 14px;
+    width: 100%;
+    justify-content: center;
+  }
+  .pad-stat-number {
+    font-size: 20px;
+  }
+  .pad-stat-label {
+    font-size: 10px;
+  }
+
+  /* Cerita Desa HP */
+  .stories-section {
+    padding: 30px 0;
+    margin-bottom: 30px;
+  }
+  .stories-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .story-card {
+    flex-direction: column;
+    padding: 14px;
+    gap: 10px;
+  }
+  .story-img {
+    width: 100%;
+    height: 150px;
+  }
+
+  /* Trust & Payment HP */
+  .trust-section {
+    margin-bottom: 30px;
+  }
+  .payment-logos {
+    gap: 6px;
+  }
+  .payment-badge {
+    font-size: 10px;
+    padding: 5px 8px;
+  }
+
+  /* Footer HP */
+  .footer {
+    padding: 24px 0 16px;
+  }
+  .footer-top {
+    flex-direction: column;
+    gap: 14px;
+    text-align: center;
+  }
+  .footer-links {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+    font-size: 12px;
+  }
+  .footer-bottom {
+    flex-direction: column;
+    gap: 6px;
+    text-align: center;
+    font-size: 11px;
+  }
+
+  /* Floating WA HP */
+  .floating-wa {
+    bottom: 14px;
+    right: 14px;
+    padding: 9px 14px;
+    font-size: 12px;
+    gap: 6px;
+  }
+  .floating-wa span:first-child {
+    font-size: 16px;
+  }
+
+  /* Drawer Cart di HP */
+  .cart-drawer {
+    max-width: 100%;
+    width: 100%;
+  }
 }
+
+/* Penegasan Khusus Layar Sangat Kecil (iPhone SE, Galaxy A, dll <= 480px) */
 @media (max-width: 480px) {
   .products-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr) !important; /* Tetap 2 barang */
+    gap: 6px !important;
   }
-  .header-top {
-    display: none;
+  .container {
+    padding: 0 6px !important;
+  }
+  .product-body {
+    padding: 6px !important;
+  }
+  .product-name {
+    font-size: 11px !important;
+  }
+  .product-price {
+    font-size: 13px !important;
   }
 }
+
