@@ -1,4 +1,4 @@
-﻿// State Manajemen Aplikasi
+// State Manajemen Aplikasi
 let appConfig = {};
 let currentUser = null;
 let currentCategory = 'semua';
@@ -31,10 +31,10 @@ async function checkUserAuth() {
       if (topAuth) {
         topAuth.innerHTML = `
           <div style="display:flex; align-items:center; gap:8px; font-size:12px;">
-            ${currentUser.picture ? `<img src="${currentUser.picture}" style="width:22px; height:22px; border-radius:50%;">` : '<span>👤</span>'}
+            ${currentUser.picture ? `<img src="${currentUser.picture}" style="width:24px; height:24px; border-radius:50%; object-fit:cover; border:1px solid #FFE6CC;">` : '<span>👤</span>'}
             <span>Hai, <strong>${currentUser.name}</strong></span>
-            ${currentUser.is_admin ? '<a href="/admin" style="background:#C85A32; color:#FFF; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:bold;">Panel Admin</a>' : ''}
-            <button onclick="userLogout()" style="background:none; color:#FFCDD2; font-size:11px; text-decoration:underline;">Keluar</button>
+            ${currentUser.is_admin ? '<a href="/admin" target="_blank" style="background:#C85A32; color:#FFF; padding:3px 10px; border-radius:4px; font-size:11px; font-weight:bold; text-decoration:none; display:inline-flex; align-items:center; gap:4px;">🏛️ Panel Admin BUMDes</a>' : '<button onclick="openMyOrdersModal()" style="background:#2E7D32; color:#FFF; padding:3px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">📦 Pesanan Saya</button>'}
+            <button onclick="userLogout()" style="background:none; color:#FFCDD2; font-size:11px; text-decoration:underline; cursor:pointer;">Keluar</button>
           </div>
         `;
       }
@@ -50,6 +50,55 @@ async function checkUserAuth() {
 async function userLogout() {
   await fetch('/api/logout', { method: 'POST' });
   window.location.reload();
+}
+
+async function openMyOrdersModal() {
+  const modal = document.getElementById('myOrdersModal');
+  const content = document.getElementById('myOrdersContent');
+  if (!modal || !content) return;
+
+  modal.classList.add('active');
+  content.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 20px;">Memuat riwayat pesanan Anda...</p>';
+
+  try {
+    const res = await fetch('/api/my-orders');
+    const data = await res.json();
+    if (data.success && data.data.length > 0) {
+      content.innerHTML = data.data.map(o => `
+        <div style="background: #FAF6EE; border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <strong style="color: var(--primary-brown-dark); font-size: 14px;">#${o.order_code}</strong>
+            <span class="status-badge status-${o.status}">${(o.status || 'pending').toUpperCase()}</span>
+          </div>
+          <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 8px;">
+            Tanggal: ${new Date(o.created_at).toLocaleDateString('id-ID')} | Kurir: ${o.courier || '-'}
+          </div>
+          <div style="font-size: 12px; margin-bottom: 8px;">
+            ${(o.items || []).map(it => `<div>• ${it.name} (${it.qty}x)</div>`).join('')}
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed #DDD; padding-top: 8px; font-size: 13px;">
+            <span>Total Belanja:</span>
+            <strong style="color: var(--terracotta);">Rp ${Number(o.total_amount).toLocaleString('id-ID')}</strong>
+          </div>
+        </div>
+      `).join('');
+    } else {
+      content.innerHTML = `
+        <div style="text-align: center; padding: 30px 10px;">
+          <div style="font-size: 36px; margin-bottom: 8px;">🛍️</div>
+          <h4 style="margin-bottom: 4px;">Belum Ada Riwayat Pesanan</h4>
+          <p style="color: var(--text-muted); font-size: 13px;">Pesanan yang Anda buat akan tercatat otomatis di sini.</p>
+        </div>
+      `;
+    }
+  } catch (err) {
+    content.innerHTML = '<p style="text-align: center; color: red; padding: 20px;">Gagal memuat pesanan.</p>';
+  }
+}
+
+function closeMyOrdersModal() {
+  const modal = document.getElementById('myOrdersModal');
+  if (modal) modal.classList.remove('active');
 }
 
 // 1. Ambil Konfigurasi Desa & BUMDes

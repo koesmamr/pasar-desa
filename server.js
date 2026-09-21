@@ -8,9 +8,9 @@ const { initDatabase } = require('./src/db');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Middleware Body Parser (Mendukung upload foto produk ukuran besar dari kamera HP)
+app.use(express.json({ limit: '25mb' }));
+app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 
 // Serve static assets dari folder public
 app.use(express.static(path.join(__dirname, 'public')));

@@ -1,18 +1,7 @@
 ﻿const express = require('express');
 const router = express.Router();
-const bcrypt = require('bcryptjs');
 const { db } = require('../db');
 
-// Simple in-memory session token store (untuk fallback login manual)
-const activeTokens = new Map();
-
-function generateToken(username) {
-  const token = 'psd_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
-  activeTokens.set(token, { username, createdAt: Date.now() });
-  return token;
-}
-
-// Helper Cek Superadmin
 function isSuperAdminEmail(email) {
   if (!email) return false;
   const clean = email.toLowerCase().trim();
@@ -20,100 +9,60 @@ function isSuperAdminEmail(email) {
   return clean === configuredAdmin || clean === 'syamsul18782@gmail.com';
 }
 
-// Middleware Proteksi Admin (Mendukung Sesi Google SSO & Token Manual)
-function requireAuth(req, res, next) {
-  // 1. Cek dari Cookie Google SSO (Pola Warung Pulsa)
+// Middleware Proteksi Admin Murni Menggunakan Sesi Google SSO
+function requireAdmin(req, res, next) {
   const cookieHeader = req.headers.cookie || '';
-  const sessionMatch = cookieHeader.match(/session_id=([^;]+)/);
-  if (sessionMatch) {
-    const sessionId = sessionMatch[1];
-    const session = db.prepare(`
-      SELECT email FROM sessions WHERE id = ? AND expires_at > datetime('now')
-    `).get(sessionId);
-
-    if (session) {
-      const user = db.prepare('SELECT * FROM users WHERE email = ?').get(session.email);
-      if (user && (user.is_admin === 1 || isSuperAdminEmail(user.email))) {
-        req.adminUser = { username: user.email, name: user.name, role: 'admin', type: 'google' };
-        return next();
-      }
-    }
+  const match = cookieHeader.match(/session_id=([^;]+)/);
+  if (!match) {
+    return res.status(401).json({
+      success: false,
+      message: 'Sesi login tidak ditemukan. Silakan masuk menggunakan Google SSO.'
+    });
   }
 
-  // 2. Cek dari Authorization Header (Bearer Token)
-  const authHeader = req.headers.authorization;
-  if (authHeader) {
-    const token = authHeader.replace('Bearer ', '').trim();
-    if (activeTokens.has(token)) {
-      req.adminUser = activeTokens.get(token);
-      return next();
-    }
+  const sessionId = match[1];
+  const session = db.prepare(`
+    SELECT email FROM sessions WHERE id = ? AND expires_at > datetime('now')
+  `).get(sessionId);
+
+  if (!session) {
+    return res.status(401).json({
+      success: false,
+      message: 'Sesi Google Anda telah berakhir. Silakan login kembali.'
+    });
   }
 
-  return res.status(401).json({
+  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(session.email);
+  if (!user) {
+    return res.status(401).json({ success: false, message: 'Akun tidak terdaftar.' });
+  }
+
+  if (user.is_blocked === 1 && !isSuperAdminEmail(user.email)) {
+    return res.status(403).json({ success: false, message: 'Akun Anda dinonaktifkan.' });
+  }
+
+  if (user.is_admin === 1 || isSuperAdminEmail(user.email)) {
+    req.adminUser = user;
+    return next();
+  }
+
+  return res.status(403).json({
     success: false,
-    message: 'Autentikasi admin diperlukan. Silakan login menggunakan Akun Google Admin atau kredensial yang sah.'
+    message: `Akses Ditolak: Akun Google (${user.email}) bukan Administrator BUMDes.`
   });
 }
 
-// 1. Admin Login Manual (Fallback)
-router.post('/login', (req, res) => {
-  try {
-    const { username, password } = req.body;
-    if (!username || !password) {
-      return res.status(400).json({ success: false, message: 'Username dan password wajib diisi' });
-    }
-
-    const admin = db.prepare('SELECT * FROM admins WHERE username = ?').get(username);
-    if (!admin) {
-      return res.status(401).json({ success: false, message: 'Username atau password salah' });
-    }
-
-    const match = bcrypt.compareSync(password, admin.password_hash);
-    if (!match) {
-      return res.status(401).json({ success: false, message: 'Username atau password salah' });
-    }
-
-    const token = generateToken(admin.username);
-
-    res.json({
-      success: true,
-      message: 'Login berhasil',
-      data: {
-        token,
-        username: admin.username,
-        full_name: admin.full_name,
-        role: admin.role
-      }
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// 2. Admin Logout
-router.post('/logout', (req, res) => {
-  const cookieHeader = req.headers.cookie || '';
-  const sessionMatch = cookieHeader.match(/session_id=([^;]+)/);
-  if (sessionMatch) {
-    db.prepare('DELETE FROM sessions WHERE id = ?').run(sessionMatch[1]);
-  }
-  const authHeader = req.headers.authorization;
-  if (authHeader) {
-    const token = authHeader.replace('Bearer ', '').trim();
-    activeTokens.delete(token);
-  }
-  res.setHeader('Set-Cookie', 'session_id=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax');
-  res.json({ success: true, message: 'Logout berhasil' });
-});
-
-// 3. Ringkasan Statistik Dashboard (PAD, Omzet, Order, Produk)
-router.get('/stats', requireAuth, (req, res) => {
+// ==============================================================================
+// 1. DASHBOARD STATS
+// ==============================================================================
+router.get('/stats', requireAdmin, (req, res) => {
   try {
     const totalProducts = db.prepare('SELECT COUNT(*) as count FROM products').get()?.count || 0;
     const totalOrders = db.prepare('SELECT COUNT(*) as count FROM orders').get()?.count || 0;
+    const totalUsers = db.prepare('SELECT COUNT(*) as count FROM users').get()?.count || 0;
+    const totalCategories = db.prepare('SELECT COUNT(*) as count FROM categories').get()?.count || 0;
     const pendingOrders = db.prepare('SELECT COUNT(*) as count FROM orders WHERE status = "pending"').get()?.count || 0;
-    
+
     const finance = db.prepare(`
       SELECT 
         COALESCE(SUM(total_amount), 0) as total_omzet,
@@ -122,7 +71,7 @@ router.get('/stats', requireAuth, (req, res) => {
     `).get();
 
     const recentOrders = db.prepare(`
-      SELECT * FROM orders ORDER BY id DESC LIMIT 5
+      SELECT * FROM orders ORDER BY id DESC LIMIT 6
     `).all();
 
     res.json({
@@ -130,11 +79,17 @@ router.get('/stats', requireAuth, (req, res) => {
       data: {
         total_products: totalProducts,
         total_orders: totalOrders,
+        total_users: totalUsers,
+        total_categories: totalCategories,
         pending_orders: pendingOrders,
         total_omzet: finance?.total_omzet || 0,
         total_pad: finance?.total_pad || 0,
         recent_orders: recentOrders,
-        admin_user: req.adminUser
+        admin_user: {
+          name: req.adminUser.name,
+          email: req.adminUser.email,
+          picture: req.adminUser.picture
+        }
       }
     });
   } catch (err) {
@@ -142,8 +97,133 @@ router.get('/stats', requireAuth, (req, res) => {
   }
 });
 
-// 4. Daftar Semua Produk (Untuk Admin)
-router.get('/products', requireAuth, (req, res) => {
+// ==============================================================================
+// 2. MANAJEMEN PENGGUNA (USER MANAGEMENT)
+// ==============================================================================
+router.get('/users', requireAdmin, (req, res) => {
+  try {
+    const users = db.prepare(`
+      SELECT u.*,
+        (SELECT COUNT(*) FROM orders o WHERE o.customer_email = u.email) as total_orders,
+        (SELECT COALESCE(SUM(total_amount), 0) FROM orders o WHERE o.customer_email = u.email) as total_spent
+      FROM users u
+      ORDER BY u.created_at DESC
+    `).all();
+
+    res.json({ success: true, data: users });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Ubah Hak Akses Admin Pengguna
+router.put('/users/:email/role', requireAdmin, (req, res) => {
+  try {
+    const { is_admin } = req.body;
+    const targetEmail = decodeURIComponent(req.params.email);
+
+    if (isSuperAdminEmail(targetEmail) && is_admin === 0) {
+      return res.status(400).json({ success: false, message: 'Super Admin utama tidak dapat dicabut hak aksesnya.' });
+    }
+
+    db.prepare('UPDATE users SET is_admin = ? WHERE email = ?').run(is_admin ? 1 : 0, targetEmail);
+    res.json({ success: true, message: 'Hak akses pengguna berhasil diperbarui' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Blokir / Buka Blokir Pengguna
+router.put('/users/:email/block', requireAdmin, (req, res) => {
+  try {
+    const { is_blocked } = req.body;
+    const targetEmail = decodeURIComponent(req.params.email);
+
+    if (isSuperAdminEmail(targetEmail)) {
+      return res.status(400).json({ success: false, message: 'Super Admin tidak dapat diblokir.' });
+    }
+
+    db.prepare('UPDATE users SET is_blocked = ? WHERE email = ?').run(is_blocked ? 1 : 0, targetEmail);
+    res.json({ success: true, message: is_blocked ? 'Pengguna berhasil diblokir' : 'Blokir pengguna telah dibuka' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Hapus Pengguna
+router.delete('/users/:email', requireAdmin, (req, res) => {
+  try {
+    const targetEmail = decodeURIComponent(req.params.email);
+    if (isSuperAdminEmail(targetEmail)) {
+      return res.status(400).json({ success: false, message: 'Super Admin tidak dapat dihapus.' });
+    }
+    db.prepare('DELETE FROM users WHERE email = ?').run(targetEmail);
+    db.prepare('DELETE FROM sessions WHERE email = ?').run(targetEmail);
+    res.json({ success: true, message: 'Pengguna berhasil dihapus dari sistem' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ==============================================================================
+// 3. MANAJEMEN KATEGORI PRODUK
+// ==============================================================================
+router.get('/categories', requireAdmin, (req, res) => {
+  try {
+    const categories = db.prepare(`
+      SELECT c.*,
+        (SELECT COUNT(*) FROM products p WHERE p.category_id = c.id) as product_count
+      FROM categories c
+      ORDER BY c.sort_order ASC, c.id ASC
+    `).all();
+    res.json({ success: true, data: categories });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/categories', requireAdmin, (req, res) => {
+  try {
+    const { name, icon, sort_order } = req.body;
+    if (!name) return res.status(400).json({ success: false, message: 'Nama kategori wajib diisi' });
+
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '-' + Date.now().toString().slice(-4);
+    db.prepare(`
+      INSERT INTO categories (name, slug, icon, sort_order)
+      VALUES (?, ?, ?, ?)
+    `).run(name, slug, icon || '📦', parseInt(sort_order) || 0);
+
+    res.json({ success: true, message: 'Kategori berhasil ditambahkan' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.put('/categories/:id', requireAdmin, (req, res) => {
+  try {
+    const { name, icon, sort_order } = req.body;
+    db.prepare(`
+      UPDATE categories SET name = ?, icon = ?, sort_order = ? WHERE id = ?
+    `).run(name, icon || '📦', parseInt(sort_order) || 0, req.params.id);
+    res.json({ success: true, message: 'Kategori berhasil diperbarui' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.delete('/categories/:id', requireAdmin, (req, res) => {
+  try {
+    db.prepare('DELETE FROM categories WHERE id = ?').run(req.params.id);
+    res.json({ success: true, message: 'Kategori berhasil dihapus' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ==============================================================================
+// 4. MANAJEMEN PRODUK (UPLOAD & EDIT)
+// ==============================================================================
+router.get('/products', requireAdmin, (req, res) => {
   try {
     const products = db.prepare(`
       SELECT p.*, c.name as category_name
@@ -157,8 +237,7 @@ router.get('/products', requireAuth, (req, res) => {
   }
 });
 
-// 5. Tambah Produk Baru
-router.post('/products', requireAuth, (req, res) => {
+router.post('/products', requireAdmin, (req, res) => {
   try {
     const {
       name,
@@ -171,7 +250,8 @@ router.post('/products', requireAuth, (req, res) => {
       description,
       village_origin,
       maker_name,
-      is_featured
+      is_featured,
+      is_active
     } = req.body;
 
     if (!name || !price) {
@@ -184,7 +264,7 @@ router.post('/products', requireAuth, (req, res) => {
       INSERT INTO products (
         name, slug, category_id, price, original_price, stock, unit,
         image_url, description, village_origin, maker_name, is_featured, is_active
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
@@ -195,21 +275,21 @@ router.post('/products', requireAuth, (req, res) => {
       parseInt(original_price) || 0,
       parseInt(stock) || 10,
       unit || 'pcs',
-      image_url || 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=600&auto=format&fit=crop&q=80',
+      image_url || 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=600',
       description || '',
       village_origin || 'Desa Nusantara',
       maker_name || 'Kelompok UMKM Desa',
-      is_featured ? 1 : 0
+      is_featured ? 1 : 0,
+      is_active !== undefined ? (is_active ? 1 : 0) : 1
     );
 
-    res.json({ success: true, message: 'Produk berhasil ditambahkan' });
+    res.json({ success: true, message: 'Produk berhasil ditambahkan ke toko' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// 6. Update Produk
-router.put('/products/:id', requireAuth, (req, res) => {
+router.put('/products/:id', requireAdmin, (req, res) => {
   try {
     const {
       name,
@@ -265,8 +345,20 @@ router.put('/products/:id', requireAuth, (req, res) => {
   }
 });
 
-// 7. Hapus Produk
-router.delete('/products/:id', requireAuth, (req, res) => {
+router.put('/products/:id/toggle', requireAdmin, (req, res) => {
+  try {
+    const prod = db.prepare('SELECT is_active FROM products WHERE id = ?').get(req.params.id);
+    if (!prod) return res.status(404).json({ success: false, message: 'Produk tidak ditemukan' });
+
+    const newStatus = prod.is_active === 1 ? 0 : 1;
+    db.prepare('UPDATE products SET is_active = ? WHERE id = ?').run(newStatus, req.params.id);
+    res.json({ success: true, message: newStatus ? 'Produk diaktifkan' : 'Produk dinonaktifkan' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.delete('/products/:id', requireAdmin, (req, res) => {
   try {
     db.prepare('DELETE FROM products WHERE id = ?').run(req.params.id);
     res.json({ success: true, message: 'Produk berhasil dihapus' });
@@ -275,16 +367,14 @@ router.delete('/products/:id', requireAuth, (req, res) => {
   }
 });
 
-// 8. Daftar Pesanan untuk Admin
-router.get('/orders', requireAuth, (req, res) => {
+// ==============================================================================
+// 5. MANAJEMEN PESANAN (ORDERS MANAGEMENT)
+// ==============================================================================
+router.get('/orders', requireAdmin, (req, res) => {
   try {
     const orders = db.prepare('SELECT * FROM orders ORDER BY id DESC').all();
     orders.forEach(o => {
-      try {
-        o.items = JSON.parse(o.items_json);
-      } catch (e) {
-        o.items = [];
-      }
+      try { o.items = JSON.parse(o.items_json); } catch (e) { o.items = []; }
     });
     res.json({ success: true, data: orders });
   } catch (err) {
@@ -292,8 +382,7 @@ router.get('/orders', requireAuth, (req, res) => {
   }
 });
 
-// 9. Update Status Pesanan
-router.put('/orders/:id/status', requireAuth, (req, res) => {
+router.put('/orders/:id/status', requireAdmin, (req, res) => {
   try {
     const { status } = req.body;
     db.prepare('UPDATE orders SET status = ? WHERE id = ?').run(status, req.params.id);
@@ -303,8 +392,19 @@ router.put('/orders/:id/status', requireAuth, (req, res) => {
   }
 });
 
-// 10. Pengaturan Toko & Desa (Whitelabel Config)
-router.get('/settings', requireAuth, (req, res) => {
+router.delete('/orders/:id', requireAdmin, (req, res) => {
+  try {
+    db.prepare('DELETE FROM orders WHERE id = ?').run(req.params.id);
+    res.json({ success: true, message: 'Data pesanan berhasil dihapus' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ==============================================================================
+// 6. PENGATURAN TOKO & DESA (WHITELABEL CONFIG)
+// ==============================================================================
+router.get('/settings', requireAdmin, (req, res) => {
   try {
     const rows = db.prepare('SELECT key, value FROM settings').all();
     const config = {};
@@ -317,7 +417,7 @@ router.get('/settings', requireAuth, (req, res) => {
   }
 });
 
-router.post('/settings', requireAuth, (req, res) => {
+router.post('/settings', requireAdmin, (req, res) => {
   try {
     const settings = req.body;
     for (const [key, value] of Object.entries(settings)) {

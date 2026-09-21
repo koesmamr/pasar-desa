@@ -11,7 +11,6 @@ const dbPath = path.join(dataDir, 'pasardesa.db');
 let rawDb = null;
 let driver = '';
 
-// Prioritas 1: node:sqlite (Built-in di Node.js 22 LTS / Ubuntu 24)
 try {
   const { DatabaseSync } = require('node:sqlite');
   rawDb = new DatabaseSync(dbPath);
@@ -19,7 +18,6 @@ try {
   rawDb.exec('PRAGMA synchronous = NORMAL;');
   driver = 'node:sqlite';
 } catch (e1) {
-  // Prioritas 2: better-sqlite3
   try {
     const Database = require('better-sqlite3');
     rawDb = new Database(dbPath);
@@ -106,6 +104,7 @@ function initDatabase() {
         phone TEXT DEFAULT '',
         picture TEXT DEFAULT '',
         is_admin INTEGER DEFAULT 0,
+        is_blocked INTEGER DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
 
@@ -159,6 +158,7 @@ function initDatabase() {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         order_code TEXT UNIQUE NOT NULL,
         customer_name TEXT NOT NULL,
+        customer_email TEXT DEFAULT '',
         customer_phone TEXT NOT NULL,
         customer_address TEXT NOT NULL,
         courier TEXT DEFAULT 'Kurir Desa / JNE',
@@ -170,23 +170,17 @@ function initDatabase() {
         notes TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
-
-      CREATE TABLE IF NOT EXISTS admins (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT UNIQUE NOT NULL,
-        password_hash TEXT NOT NULL,
-        full_name TEXT,
-        role TEXT DEFAULT 'admin'
-      );
     `);
+
+    // Migrasi kolom jika tabel lama belum memiliki kolom baru
+    try { db.exec('ALTER TABLE users ADD COLUMN is_blocked INTEGER DEFAULT 0;'); } catch (e) {}
+    try { db.exec('ALTER TABLE orders ADD COLUMN customer_email TEXT DEFAULT "";'); } catch (e) {}
   }
 
   seedDefaults();
 }
 
 function seedDefaults() {
-  const bcrypt = require('bcryptjs');
-
   const defaultSettings = [
     { key: 'desa_name', value: process.env.DESA_NAME || 'Desa Nusantara' },
     { key: 'bumdes_name', value: process.env.BUMDES_NAME || 'BUMDes Berkah Mandiri' },
@@ -208,7 +202,7 @@ function seedDefaults() {
     }
   }
 
-  // 2. Kategori Default
+  // Kategori Default
   const defaultCategories = [
     { id: 1, name: 'Kategori Pangan & Beras', slug: 'pangan', icon: '🌾', sort_order: 1 },
     { id: 2, name: 'Makanan & Minuman Olahan', slug: 'makanan-minuman', icon: '☕', sort_order: 2 },
@@ -226,7 +220,7 @@ function seedDefaults() {
     }
   }
 
-  // 3. Produk Default (Sesuai Mockup Gambar UI)
+  // Produk Default
   const defaultProducts = [
     {
       name: 'Kain Tenun Ikat Asli',
@@ -354,7 +348,7 @@ function seedDefaults() {
     }
   }
 
-  // 4. Cerita Desa
+  // Cerita Desa
   const defaultStories = [
     {
       title: 'Helai Demi Helai Warisan Leluhur: Kisah Ibu Aminah Penenun Ikat',
@@ -386,18 +380,6 @@ function seedDefaults() {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `).run(s.title, s.author_name, s.author_role, s.village, s.excerpt, s.content, s.image_url, s.read_time);
     }
-  }
-
-  // 5. Default Admin User
-  const adminUser = process.env.ADMIN_USER || 'admin';
-  const adminPass = process.env.ADMIN_PASS || 'admin123';
-  const adminExist = db.prepare('SELECT id FROM admins WHERE username = ?').get(adminUser);
-  if (!adminExist) {
-    const hash = bcrypt.hashSync(adminPass, 10);
-    db.prepare(`
-      INSERT INTO admins (username, password_hash, full_name, role)
-      VALUES (?, ?, ?, 'superadmin')
-    `).run(adminUser, hash, 'Administrator BUMDes');
   }
 }
 

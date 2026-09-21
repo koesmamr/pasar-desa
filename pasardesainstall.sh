@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 # ==============================================================================
 # AUTOINSTALL SCRIPT: PASAR DESA NUSANTARA (GOOGLE SSO & MULTI-APP READY)
 # Target OS: Ubuntu 24.04 LTS / Ubuntu 22.04 LTS
@@ -109,11 +109,12 @@ fi
 # 7. Konfigurasi Nginx Reverse Proxy Multi-Site Aman
 echo -e "${YELLOW}==> [7/7] Mengonfigurasi Nginx Reverse Proxy Pasar Desa (Port ${APP_PORT})...${NC}"
 
-DESA_DOMAIN="${DOMAIN:-}"
+DESA_DOMAIN="${DOMAIN:-dutohe.bintangcod.com}"
 
-if [ -n "$DESA_DOMAIN" ]; then
-    echo "Mengonfigurasi domain khusus: $DESA_DOMAIN"
+if [ "$HAS_WARUNGPULSA" = true ]; then
+    echo "Terdeteksi Warung Pulsa. Mengonfigurasi Pasar Desa untuk domain ($DESA_DOMAIN) pada Port 80 dan Port 8080..."
     cat > /etc/nginx/sites-available/pasar-desa << EOF
+# 1. Akses via Domain Resmi (Port 80)
 server {
     listen 80;
     listen [::]:80;
@@ -137,11 +138,8 @@ server {
         proxy_read_timeout 300s;
     }
 }
-EOF
-else
-    if [ "$HAS_WARUNGPULSA" = true ]; then
-        echo "Mengatur Pasar Desa pada Port 8080 agar Port 80 Warung Pulsa tetap aman..."
-        cat > /etc/nginx/sites-available/pasar-desa << EOF
+
+# 2. Akses Alternatif via Port 8080 (IP Langsung & Domain)
 server {
     listen 8080;
     listen [::]:8080;
@@ -166,13 +164,13 @@ server {
     }
 }
 EOF
-    else
-        cat > /etc/nginx/sites-available/pasar-desa << EOF
+else
+    cat > /etc/nginx/sites-available/pasar-desa << EOF
 server {
     listen 80 default_server;
     listen [::]:80 default_server;
     listen 8080;
-    server_name _;
+    server_name $DESA_DOMAIN www.$DESA_DOMAIN _;
 
     client_max_body_size 50M;
 
@@ -193,8 +191,7 @@ server {
     }
 }
 EOF
-        rm -f /etc/nginx/sites-enabled/default
-    fi
+    rm -f /etc/nginx/sites-enabled/default
 fi
 
 # Aktifkan site pasar-desa di Nginx

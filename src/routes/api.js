@@ -37,7 +37,7 @@ function getCurrentUser(req) {
 }
 
 // ==============================================================================
-// 1. GOOGLE SSO AUTHENTICATION (Adopsi Pola Warung Pulsa)
+// 1. GOOGLE SSO AUTHENTICATION (Murni Google SSO Tanpa Password)
 // ==============================================================================
 
 // POST /api/auth - Verifikasi Google ID Token
@@ -48,52 +48,51 @@ router.post('/auth', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Google Credential Token wajib disertakan' });
     }
 
-    // Verifikasi Token ke Google OAuth2 API
+    // Verifikasi langsung ke Google OAuth2 API
     const googleRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${credential}`);
     if (!googleRes.ok) {
       return res.status(401).json({ success: false, message: 'Token Google tidak valid atau telah kedaluwarsa' });
     }
 
     const payload = await googleRes.json();
-    const googleClientId = process.env.GOOGLE_CLIENT_ID || '727817597785-oub85kbvvsl640v7q4cak661vn5jt7kh.apps.googleusercontent.com';
-
-    // Validasi Audience Client ID
-    if (payload.aud !== googleClientId) {
-      console.warn(`[Google SSO] Client ID mismatch: aud=${payload.aud}, expected=${googleClientId}`);
-      // Lanjutkan jika dalam mode toleransi atau tolak jika tidak match
-      if (process.env.NODE_ENV === 'production' && payload.aud !== googleClientId) {
-        return res.status(400).json({ success: false, message: 'Invalid Client ID Google' });
-      }
-    }
-
     const email = (payload.email || '').toLowerCase().trim();
     const name = payload.name || 'Pengguna Desa';
     const picture = payload.picture || '';
+
+    // Cek apakah akun terdaftar sebagai admin
     const isAdmin = isSuperAdmin(email) ? 1 : 0;
 
-    // Simpan atau Perbarui Data Pengguna di Database
+    // Cek apakah pengguna sudah pernah terdaftar
     let user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
     if (!user) {
       db.prepare(`
-        INSERT INTO users (email, name, picture, is_admin)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO users (email, name, picture, is_admin, is_blocked)
+        VALUES (?, ?, ?, ?, 0)
       `).run(email, name, picture, isAdmin);
       console.log(`[Google SSO] Pengguna baru terdaftar: ${email} (Admin: ${isAdmin})`);
     } else {
+      // Cek pemblokiran (hanya jika bukan superadmin)
+      if (user.is_blocked === 1 && !isSuperAdmin(email)) {
+        return res.status(403).json({
+          success: false,
+          message: 'Akun Google Anda dinonaktifkan oleh Administrator BUMDes.'
+        });
+      }
+
       const updatedAdmin = isAdmin || user.is_admin ? 1 : 0;
       db.prepare(`
         UPDATE users SET name = ?, picture = ?, is_admin = ? WHERE email = ?
       `).run(name, picture, updatedAdmin, email);
     }
 
-    // Buat Session Baru (Berlaku 7 Hari)
+    // Buat Session Baru (Masa aktif 7 Hari)
     const newSessionId = crypto.randomUUID ? crypto.randomUUID() : (Date.now() + '-' + Math.random().toString(36).substring(2));
     db.prepare(`
       INSERT INTO sessions (id, email, expires_at)
       VALUES (?, ?, datetime('now', '+7 days'))
     `).run(newSessionId, email);
 
-    // Set HTTP-Only Cookie
+    // Kirim Cookie HTTP-Only
     res.setHeader('Set-Cookie', `session_id=${newSessionId}; HttpOnly; Path=/; Max-Age=604800; SameSite=Lax`);
 
     return res.json({
@@ -103,17 +102,17 @@ router.post('/auth', async (req, res) => {
         email,
         name,
         picture,
-        is_admin: isAdmin === 1
+        is_admin: isAdmin === 1 || (user && user.is_admin === 1)
       }
     });
 
   } catch (err) {
     console.error('[Google SSO Error]', err);
-    return res.status(500).json({ success: false, message: 'Gagal memproses autentikasi Google: ' + err.message });
+    return res.status(500).json({ success: false, message: 'Gagal autentikasi Google: ' + err.message });
   }
 });
 
-// GET /api/auth/me - Cek Sesi Pengguna Aktif
+// GET /api/auth/me - Cek Sesi Pengguna
 router.get('/auth/me', (req, res) => {
   try {
     const user = getCurrentUser(req);
@@ -128,7 +127,8 @@ router.get('/auth/me', (req, res) => {
         name: user.name,
         picture: user.picture,
         phone: user.phone,
-        is_admin: user.is_admin === 1 || user.is_superadmin
+        is_admin: user.is_admin === 1 || user.is_superadmin,
+        is_blocked: user.is_blocked === 1
       }
     });
   } catch (err) {
@@ -136,7 +136,7 @@ router.get('/auth/me', (req, res) => {
   }
 });
 
-// POST /api/logout - Keluar Akun
+// POST /api/logout - Keluar Sesi
 router.post('/logout', (req, res) => {
   try {
     const cookieHeader = req.headers.cookie || '';
@@ -152,10 +152,10 @@ router.post('/logout', (req, res) => {
 });
 
 // ==============================================================================
-// 2. PUBLIC STORE CONFIG & CATALOG ROUTES
+// 2. KATALOG & TRANSAKSI PUBLIK
 // ==============================================================================
 
-// Ambil Pengaturan Publik Toko & Desa
+// Ambil Konfigurasi Publik Toko
 router.get('/config', (req, res) => {
   try {
     const rows = db.prepare('SELECT key, value FROM settings').all();
@@ -171,7 +171,7 @@ router.get('/config', (req, res) => {
 // Ambil Kategori Produk
 router.get('/categories', (req, res) => {
   try {
-    const categories = db.prepare('SELECT * FROM categories ORDER BY sort_order ASC').all();
+    const categories = db.prepare('SELECT * FROM categories ORDER BY sort_order ASC, id ASC').all();
     res.json({ success: true, data: categories });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -233,7 +233,7 @@ router.get('/products/:slug', (req, res) => {
   }
 });
 
-// Cerita Desa & Profil Pengrajin/Petani
+// Cerita Desa
 router.get('/stories', (req, res) => {
   try {
     const stories = db.prepare('SELECT * FROM stories ORDER BY id ASC').all();
@@ -259,6 +259,9 @@ router.post('/orders', (req, res) => {
     if (!customer_name || !customer_phone || !customer_address || !items || !items.length) {
       return res.status(400).json({ success: false, message: 'Data pesanan belum lengkap!' });
     }
+
+    const currentUser = getCurrentUser(req);
+    const customer_email = currentUser ? currentUser.email : '';
 
     let total_amount = 0;
     const validatedItems = [];
@@ -292,14 +295,15 @@ router.post('/orders', (req, res) => {
 
     const stmt = db.prepare(`
       INSERT INTO orders (
-        order_code, customer_name, customer_phone, customer_address,
+        order_code, customer_name, customer_email, customer_phone, customer_address,
         courier, payment_method, total_amount, pad_amount, status, items_json, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
     `);
 
     stmt.run(
       order_code,
       customer_name,
+      customer_email,
       customer_phone,
       customer_address,
       courier || 'Kurir BUMDes / JNE',
@@ -334,7 +338,7 @@ router.post('/orders', (req, res) => {
     waText += `\n💰 *Total Pembayaran:* Rp ${total_amount.toLocaleString('id-ID')}\n`;
     waText += `🌱 *Kontribusi Kas PAD Desa (${padPercent}%):* Rp ${pad_amount.toLocaleString('id-ID')}\n`;
     if (notes) waText += `📝 *Catatan:* ${notes}\n`;
-    waText += `\nMohon konfirmasi ketersediaan dan proses pesanan saya. Terima kasih!`;
+    waText += `\nMohon konfirmasi pesanan saya. Terima kasih!`;
 
     const waLink = `https://wa.me/${targetWa}?text=${encodeURIComponent(waText)}`;
 
@@ -356,7 +360,24 @@ router.post('/orders', (req, res) => {
   }
 });
 
-// Cek Status Pesanan
+// Cek Pesanan Saya (Pengguna yang sedang Login)
+router.get('/my-orders', (req, res) => {
+  try {
+    const user = getCurrentUser(req);
+    if (!user) {
+      return res.status(401).json({ success: false, message: 'Silakan login terlebih dahulu' });
+    }
+    const orders = db.prepare('SELECT * FROM orders WHERE customer_email = ? ORDER BY id DESC').all(user.email);
+    orders.forEach(o => {
+      try { o.items = JSON.parse(o.items_json); } catch (e) { o.items = []; }
+    });
+    res.json({ success: true, data: orders });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Cek Detail Pesanan by Code
 router.get('/orders/:code', (req, res) => {
   try {
     const order = db.prepare('SELECT * FROM orders WHERE order_code = ?').get(req.params.code);

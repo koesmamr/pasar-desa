@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="id">
 <head>
   <meta charset="UTF-8">
@@ -295,6 +295,21 @@
         <button onclick="closeInvoiceModal()" style="background: none; color: #FFF; font-size: 22px;">&times;</button>
       </div>
       <div class="modal-body" id="invoiceModalBody"></div>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       MY ORDERS MODAL (PESANAN SAYA)
+       ========================================================================== -->
+  <div class="modal-overlay" id="myOrdersModal">
+    <div class="modal-dialog" style="max-width: 600px;">
+      <div class="modal-header">
+        <h3 style="font-size: 16px;">📦 Riwayat Pesanan Saya</h3>
+        <button onclick="closeMyOrdersModal()" style="background: none; color: #FFF; font-size: 22px;">&times;</button>
+      </div>
+      <div class="modal-body" id="myOrdersContent">
+        <p style="text-align: center; color: var(--text-muted); padding: 20px;">Memuat riwayat pesanan...</p>
+      </div>
     </div>
   </div>
 
