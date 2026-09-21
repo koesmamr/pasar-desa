@@ -1,4 +1,4 @@
-﻿const fs = require('fs');
+const fs = require('fs');
 const path = require('path');
 
 const dataDir = path.join(__dirname, '..', 'data');
@@ -191,14 +191,17 @@ function seedDefaults() {
     { key: 'bank_account', value: process.env.BANK_ACCOUNT || '0123-01-000456-50-8' },
     { key: 'bank_holder', value: process.env.BANK_HOLDER || 'BUMDES BERKAH MANDIRI' },
     { key: 'store_address', value: 'Jl. Raya Desa No. 12, Kantor BUMDes Berkah Mandiri' },
-    { key: 'google_client_id', value: process.env.GOOGLE_CLIENT_ID || '727817597785-oub85kbvvsl640v7q4cak661vn5jt7kh.apps.googleusercontent.com' },
+    { key: 'google_client_id', value: process.env.GOOGLE_CLIENT_ID || '857800648920-ue7akumho3f7ie9e0ir102goqvceji6d.apps.googleusercontent.com' },
+    { key: 'google_client_secret', value: process.env.GOOGLE_CLIENT_SECRET || '' },
     { key: 'admin_email', value: process.env.ADMIN_EMAIL || 'syamsul18782@gmail.com' }
   ];
 
   for (const s of defaultSettings) {
-    const existing = db.prepare('SELECT key FROM settings WHERE key = ?').get(s.key);
+    const existing = db.prepare('SELECT key, value FROM settings WHERE key = ?').get(s.key);
     if (!existing) {
       db.prepare('INSERT INTO settings (key, value) VALUES (?, ?)').run(s.key, s.value);
+    } else if (s.key === 'google_client_id' && existing.value.includes('727817597785')) {
+      db.prepare('UPDATE settings SET value = ? WHERE key = ?').run(s.value, s.key);
     }
   }
 

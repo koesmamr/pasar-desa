@@ -1,4 +1,4 @@
-﻿const express = require('express');
+const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
 const { db } = require('../db');
@@ -161,7 +161,7 @@ router.get('/config', (req, res) => {
     const rows = db.prepare('SELECT key, value FROM settings').all();
     const config = {};
     rows.forEach(r => { config[r.key] = r.value; });
-    config.google_client_id = process.env.GOOGLE_CLIENT_ID || config.google_client_id || '727817597785-oub85kbvvsl640v7q4cak661vn5jt7kh.apps.googleusercontent.com';
+    config.google_client_id = process.env.GOOGLE_CLIENT_ID || config.google_client_id || '857800648920-ue7akumho3f7ie9e0ir102goqvceji6d.apps.googleusercontent.com';
     res.json({ success: true, data: config });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

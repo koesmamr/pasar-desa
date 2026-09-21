@@ -1,4 +1,4 @@
-﻿const express = require('express');
+const express = require('express');
 const router = express.Router();
 const { db } = require('../db');
 
@@ -409,7 +409,7 @@ router.get('/settings', requireAdmin, (req, res) => {
     const rows = db.prepare('SELECT key, value FROM settings').all();
     const config = {};
     rows.forEach(r => { config[r.key] = r.value; });
-    config.google_client_id = process.env.GOOGLE_CLIENT_ID || config.google_client_id || '727817597785-oub85kbvvsl640v7q4cak661vn5jt7kh.apps.googleusercontent.com';
+    config.google_client_id = process.env.GOOGLE_CLIENT_ID || config.google_client_id || '857800648920-ue7akumho3f7ie9e0ir102goqvceji6d.apps.googleusercontent.com';
     config.admin_email = process.env.ADMIN_EMAIL || config.admin_email || 'syamsul18782@gmail.com';
     res.json({ success: true, data: config });
   } catch (err) {

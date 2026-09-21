@@ -99,7 +99,9 @@ if [ ! -f "$APP_DIR/.env" ]; then
 else
     # Pastikan variabel Google SSO ada di file .env jika sebelumnya belum ada
     if ! grep -q "GOOGLE_CLIENT_ID" "$APP_DIR/.env"; then
-        echo 'GOOGLE_CLIENT_ID="727817597785-oub85kbvvsl640v7q4cak661vn5jt7kh.apps.googleusercontent.com"' >> "$APP_DIR/.env"
+        echo 'GOOGLE_CLIENT_ID="857800648920-ue7akumho3f7ie9e0ir102goqvceji6d.apps.googleusercontent.com"' >> "$APP_DIR/.env"
+    else
+        sed -i 's/727817597785-oub85kbvvsl640v7q4cak661vn5jt7kh.apps.googleusercontent.com/857800648920-ue7akumho3f7ie9e0ir102goqvceji6d.apps.googleusercontent.com/g' "$APP_DIR/.env"
     fi
     if ! grep -q "ADMIN_EMAIL" "$APP_DIR/.env"; then
         echo 'ADMIN_EMAIL="syamsul18782@gmail.com"' >> "$APP_DIR/.env"

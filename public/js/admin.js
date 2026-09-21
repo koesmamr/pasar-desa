@@ -911,7 +911,7 @@ async function loadSettings() {
     document.getElementById('setBumdesName').value = c.bumdes_name || '';
     document.getElementById('setTagline').value = c.store_tagline || '';
     document.getElementById('setAdminEmail').value = c.admin_email || 'syamsul18782@gmail.com';
-    document.getElementById('setGoogleClientId').value = c.google_client_id || '727817597785-oub85kbvvsl640v7q4cak661vn5jt7kh.apps.googleusercontent.com';
+    document.getElementById('setGoogleClientId').value = c.google_client_id || '857800648920-ue7akumho3f7ie9e0ir102goqvceji6d.apps.googleusercontent.com';
     document.getElementById('setWa').value = c.whatsapp_number || '';
     document.getElementById('setPadPercent').value = c.pad_percentage || '5';
     document.getElementById('setBankName').value = c.bank_name || '';
