@@ -986,6 +986,8 @@ async function verifyPayment(orderId) {
     alert('Gagal memverifikasi pembayaran');
   }
 }
+
+function closeOrderDetailModal() {
   document.getElementById('orderDetailModal').classList.remove('active');
 }
 
