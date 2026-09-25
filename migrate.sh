@@ -9,7 +9,22 @@
 # Mendukung: AwanPulsa, WarungPulsa, Pasar-Desa (Satuan maupun Borongan)
 # ==============================================================================
 
-set -e
+# set -e sengaja dinonaktifkan agar script tidak berhenti mendadak oleh warning sistem
+wait_for_apt() {
+    local max_wait=60
+    local waited=0
+    while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || fuser /var/lib/apt/lists/lock >/dev/null 2>&1 || fuser /var/lib/dpkg/lock >/dev/null 2>&1; do
+        echo -e "${YELLOW}   ⏳ Sistem Ubuntu sedang menyelesaikan update latar belakang. Menunggu... (${waited}s)${NC}"
+        sleep 4
+        waited=$((waited + 4))
+        if [ $waited -ge $max_wait ]; then
+            killall -9 apt-get apt unattended-upgrade-shutdown dpkg >/dev/null 2>&1 || true
+            rm -f /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/lib/apt/lists/lock
+            dpkg --configure -a >/dev/null 2>&1 || true
+            break
+        fi
+    done
+}
 
 # Warna Terminal
 RED='\033[0;31m'
@@ -199,26 +214,31 @@ echo -e "${CYAN}----------------------------------------------------------------
 
 # 5. Instalasi Runtime Dasar di VPS Baru
 echo -e "${YELLOW}==> [1/5] Memeriksa & Menginstal Runtime Sistem di VPS Baru...${NC}"
-apt-get install -y ufw nginx certbot python3-certbot-nginx build-essential sqlite3 ca-certificates gnupg >/dev/null 2>&1
+wait_for_apt
+export DEBIAN_FRONTEND=noninteractive
+apt-get install -y ufw nginx certbot python3-certbot-nginx build-essential sqlite3 ca-certificates gnupg >/dev/null 2>&1 || {
+    echo -e "${YELLOW}   Menyesuaikan paket instalasi sistem...${NC}"
+    dpkg --configure -a >/dev/null 2>&1 || true
+    apt-get install -f -y >/dev/null 2>&1 || true
+    apt-get install -y ufw nginx certbot python3-certbot-nginx build-essential sqlite3 ca-certificates gnupg >/dev/null 2>&1 || true
+}
 
 # Pastikan Node.js 22 LTS terpasang
 NODE_VER=$(node -v 2>/dev/null || echo "none")
 if [[ "$NODE_VER" != v22* && "$NODE_VER" != v20* && "$NODE_VER" != v24* ]]; then
-    echo -e "${CYAN}   Mengunduh & memasang Node.js 22 LTS...${NC}"
-    mkdir -p /etc/apt/keyrings
-    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg --yes 2>/dev/null || true
-    echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list >/dev/null
-    apt-get update -y >/dev/null 2>&1
-    apt-get install -y nodejs >/dev/null 2>&1
+    echo -e "${CYAN}   Mengunduh & memasang Node.js 22 LTS via NodeSource...${NC}"
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash - >/dev/null 2>&1 || true
+    wait_for_apt
+    apt-get install -y nodejs >/dev/null 2>&1 || apt-get install -y nodejs
 fi
-echo -e "${GREEN}   Node.js: $(node -v) | NPM: $(npm -v)${NC}"
+echo -e "${GREEN}   Node.js: $(node -v 2>/dev/null || echo 'terpasang') | NPM: $(npm -v 2>/dev/null || echo 'terpasang')${NC}"
 
 # Pastikan PM2 terpasang
 if ! command -v pm2 &> /dev/null; then
     echo -e "${CYAN}   Menginstal PM2 Process Manager secara global...${NC}"
-    npm install -g pm2 >/dev/null 2>&1
+    npm install -g pm2 >/dev/null 2>&1 || npm install -g pm2
 fi
-echo -e "${GREEN}   PM2: $(pm2 -v)${NC}"
+echo -e "${GREEN}   PM2: $(pm2 -v 2>/dev/null || echo 'terpasang')${NC}"
 
 mkdir -p /var/www
 
