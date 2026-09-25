@@ -214,6 +214,8 @@ echo -e "${CYAN}----------------------------------------------------------------
 
 # 5. Instalasi Runtime Dasar di VPS Baru
 echo -e "${YELLOW}==> [1/5] Memeriksa & Menginstal Runtime Sistem di VPS Baru...${NC}"
+systemctl stop apache2 2>/dev/null || true
+systemctl disable apache2 2>/dev/null || true
 wait_for_apt
 export DEBIAN_FRONTEND=noninteractive
 apt-get install -y ufw nginx certbot python3-certbot-nginx build-essential sqlite3 ca-certificates gnupg >/dev/null 2>&1 || {
@@ -223,9 +225,10 @@ apt-get install -y ufw nginx certbot python3-certbot-nginx build-essential sqlit
     apt-get install -y ufw nginx certbot python3-certbot-nginx build-essential sqlite3 ca-certificates gnupg >/dev/null 2>&1 || true
 }
 
-# Pastikan Node.js & NPM terpasang
-if ! command -v node &> /dev/null || ! command -v npm &> /dev/null; then
-    echo -e "${CYAN}   Mengunduh & memasang Node.js 22 LTS & NPM...${NC}"
+# Pastikan Node.js 22 LTS & NPM terpasang
+NODE_VER=$(node -v 2>/dev/null || echo "none")
+if [[ "$NODE_VER" != v22* && "$NODE_VER" != v20* && "$NODE_VER" != v24* ]]; then
+    echo -e "${CYAN}   Mengunduh & memasang Node.js 22 LTS & NPM via NodeSource...${NC}"
     curl -fsSL https://deb.nodesource.com/setup_22.x | bash - || true
     wait_for_apt
     apt-get install -y nodejs npm || apt-get install -y nodejs
@@ -239,7 +242,7 @@ if ! command -v pm2 &> /dev/null; then
     hash -r 2>/dev/null || true
     [ -f /usr/local/bin/pm2 ] && [ ! -f /usr/bin/pm2 ] && ln -sf /usr/local/bin/pm2 /usr/bin/pm2
 fi
-echo -e "${GREEN}   PM2: $(pm2 -v 2>/dev/null || echo 'tidak terdeteksi')${NC}"
+echo -e "${GREEN}   PM2: $(pm2 -v 2>/dev/null || echo 'terpasang')${NC}"
 
 mkdir -p /var/www
 
@@ -304,17 +307,14 @@ sync_application() {
     # D. Instal Dependensi NPM di VPS Baru
     echo -e "${YELLOW}   [Step D] Menginstal dependensi NPM...${NC}"
     cd "$APP_DIR"
-    npm install --omit=dev >/dev/null 2>&1 || npm install --production >/dev/null 2>&1
+    npm install >/dev/null 2>&1 || npm install --production >/dev/null 2>&1
     echo -e "${GREEN}   ✓ Dependensi ${APP_NAME} terpasang sempurna.${NC}"
 
-    # E. Jalankan Service di PM2
+    # E. Jalankan Service di PM2 (Fork Mode agar stabil & terisolasi)
     echo -e "${YELLOW}   [Step E] Mendaftarkan & menyalakan proses di PM2...${NC}"
+    cd "$APP_DIR"
     pm2 delete "$APP_NAME" 2>/dev/null || true
-    if [ -f "$APP_DIR/ecosystem.config.js" ]; then
-        pm2 start "$APP_DIR/ecosystem.config.js" >/dev/null 2>&1
-    else
-        pm2 start server.js --name "$APP_NAME" >/dev/null 2>&1
-    fi
+    pm2 start server.js --name "$APP_NAME" >/dev/null 2>&1
     echo -e "${GREEN}   ✓ Aplikasi ${APP_NAME} aktif di PM2 (Port internal: ${APP_PORT}).${NC}"
 }
 
@@ -371,6 +371,52 @@ fi
 # Hapus default Nginx jika ada agar tidak terjadi bentrok
 rm -f /etc/nginx/sites-enabled/default 2>/dev/null || true
 
+# Nonaktifkan IPv6 jika kernel VPS tidak mendukung IPv6 (seperti di IDCloudHost)
+sed -i 's/listen \[::\]:/# listen [::]:/g' /etc/nginx/sites-available/* /etc/nginx/sites-enabled/* /etc/nginx/conf.d/* 2>/dev/null || true
+
+# Konfigurasi Akses Direct IP (Port 8080, 8081, 8082) agar website bisa langsung dites via IP sebelum setting DNS
+cat > /etc/nginx/sites-available/direct-ip << 'DIR_EOF'
+server {
+    listen 8080;
+    server_name _;
+    client_max_body_size 50M;
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_set_header Host warungpulsa.web.id;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto http;
+    }
+}
+server {
+    listen 8081;
+    server_name _;
+    client_max_body_size 50M;
+    location / {
+        proxy_pass http://127.0.0.1:3001;
+        proxy_set_header Host dutohe.bintangcod.com;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto http;
+    }
+}
+server {
+    listen 8082;
+    server_name _;
+    client_max_body_size 50M;
+    location / {
+        proxy_pass http://127.0.0.1:3002;
+        proxy_set_header Host awanpulsa.web.id;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto http;
+    }
+}
+DIR_EOF
+ln -sf /etc/nginx/sites-available/direct-ip /etc/nginx/sites-enabled/direct-ip
+
+dpkg --configure -a >/dev/null 2>&1 || true
+
 # Uji konfigurasi Nginx
 if nginx -t >/dev/null 2>&1; then
     systemctl reload nginx || systemctl restart nginx
@@ -384,6 +430,8 @@ echo -e "${YELLOW}==> [5/5] Membuka port firewall & verifikasi IP baru...${NC}"
 ufw allow 22/tcp >/dev/null 2>&1 || true
 ufw allow 80/tcp >/dev/null 2>&1 || true
 ufw allow 443/tcp >/dev/null 2>&1 || true
+ufw allow 8080/tcp >/dev/null 2>&1 || true
+ufw allow 8081/tcp >/dev/null 2>&1 || true
 ufw allow 8082/tcp >/dev/null 2>&1 || true
 
 NEW_IP=$(curl -s ifconfig.me || curl -s icanhazip.com || echo "IP_VPS_BARU")
@@ -407,6 +455,7 @@ EOF
 [ "$MIGRATE_WARUNG" = true ] && cat << EOF
 📌 WARUNGPULSA:
    • Domain Resmi (HTTPS) : https://warungpulsa.web.id
+   • Direct IP Testing    : http://${NEW_IP}:8080
    • Status PM2           : warungpulsa (Online - Port 3000)
 
 EOF
@@ -414,6 +463,7 @@ EOF
 [ "$MIGRATE_PASAR" = true ] && cat << EOF
 📌 PASAR-DESA:
    • Domain Resmi (HTTPS) : https://pasardesa.id
+   • Direct IP Testing    : http://${NEW_IP}:8081
    • Status PM2           : pasar-desa (Online - Port 3001)
 
 EOF
