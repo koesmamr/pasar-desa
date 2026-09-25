@@ -121,6 +121,24 @@ while [ -z "$OLD_IP" ]; do
     read -r -p "IP VPS Lama               : " OLD_IP
 done
 
+# Validasi Anti-Human-Error: Jangan sampai script dijalankan di VPS Lama itu sendiri
+LOCAL_IPS=$(hostname -I 2>/dev/null || ip addr show 2>/dev/null | grep 'inet ' | awk '{print $2}' | cut -d/ -f1 || echo "")
+PUBLIC_IP=$(curl -s --max-time 3 ifconfig.me 2>/dev/null || curl -s --max-time 3 icanhazip.com 2>/dev/null || echo "")
+
+for CHECK_IP in $LOCAL_IPS $PUBLIC_IP 127.0.0.1 localhost ::1; do
+    if [ -n "$CHECK_IP" ] && [ "$OLD_IP" = "$CHECK_IP" ]; then
+        echo ""
+        echo -e "${RED}================================================================================${NC}"
+        echo -e "${RED}${BOLD}[FATAL ERROR] PENGAMAN SERVER AKTIF - EKSEKUSI DIBATALKAN!${NC}"
+        echo -e "${RED}================================================================================${NC}"
+        echo -e "Anda memasukkan IP server ini sendiri (${BOLD}${OLD_IP}${NC})!"
+        echo -e "Script migrasi ini dirancang ${BOLD}HANYA untuk dijalankan di VPS BARU${NC}."
+        echo -e "Sistem menghentikan proses secara otomatis untuk melindungi data server Anda."
+        echo -e "${RED}================================================================================${NC}"
+        exit 1
+    fi
+done
+
 read -r -p "Port SSH VPS Lama [22]    : " OLD_PORT
 OLD_PORT="${OLD_PORT:-22}"
 
@@ -225,22 +243,23 @@ sync_application() {
     echo -e "${BOLD}MIGRASI APLIKASI: ${APP_NAME^^} (Direktori: ${APP_DIR})${NC}"
     echo -e "${MAGENTA}================================================================================${NC}"
 
-    # A. Checkpoint WAL SQLite di VPS Lama agar data RAM/WAL tersimpan 100% rapi ke disk
-    echo -e "${YELLOW}   [Step A] Melakukan SQLite WAL Checkpoint di VPS Lama...${NC}"
+    # A. Checkpoint WAL SQLite di VPS Lama secara non-blocking (PASSIVE)
+    # Mode PASSIVE memastikan transaksi terbaru di RAM disinkronkan ke disk TANPA mengunci / mengganggu web yang sedang berjalan di VPS Lama
+    echo -e "${YELLOW}   [Step A] Melakukan SQLite WAL Sync di VPS Lama (Non-blocking)...${NC}"
     eval "$SSH_CMD $OLD_USER@$OLD_IP '
         if [ -f \"${APP_DIR}/data/${DB_NAME}\" ]; then
-            sqlite3 \"${APP_DIR}/data/${DB_NAME}\" \"PRAGMA wal_checkpoint(TRUNCATE);\" 2>/dev/null || true
+            sqlite3 \"${APP_DIR}/data/${DB_NAME}\" \"PRAGMA wal_checkpoint(PASSIVE);\" 2>/dev/null || true
         fi
     '" || true
 
     # B. Clone atau Perbarui Source Code di VPS Baru
     echo -e "${YELLOW}   [Step B] Menyiapkan source code dari GitHub (${REPO_URL})...${NC}"
+    mkdir -p "$APP_DIR"
     if [ -d "$APP_DIR/.git" ]; then
         cd "$APP_DIR"
         git fetch origin >/dev/null 2>&1 || true
         git reset --hard origin/main >/dev/null 2>&1 || git pull origin main >/dev/null 2>&1 || true
-    else
-        rm -rf "$APP_DIR"
+    elif [ -z "$(ls -A "$APP_DIR" 2>/dev/null)" ]; then
         git clone "$REPO_URL" "$APP_DIR" >/dev/null 2>&1 || {
             echo -e "${YELLOW}   Git clone gagal/private, menyalin langsung seluruh file dari VPS Lama...${NC}"
             sshpass -p "$OLD_PASS" rsync -avz -e "ssh -p $OLD_PORT -o StrictHostKeyChecking=no" \
