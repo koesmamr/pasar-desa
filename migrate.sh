@@ -21,15 +21,7 @@ MAGENTA='\033[0;35m'
 BOLD='\033[1m'
 NC='\033[0m'
 
-# Pastikan input terminal interaktif dapat dibaca meski dijalankan via: curl ... | bash
-if [ -t 0 ]; then
-    : # stdin sudah merupakan terminal interaktif
-elif [ -e /dev/tty ]; then
-    exec < /dev/tty
-else
-    echo -e "${RED}[ERROR] Terminal interaktif (/dev/tty) tidak terdeteksi.${NC}"
-    exit 1
-fi
+
 
 clear
 echo -e "${CYAN}"
@@ -59,7 +51,7 @@ echo -e "  ${BOLD}[4]${NC} ${GREEN}${BOLD}MIGRASI SEMUA APLIKASI (Full Clone 3 A
 echo -e "  ${BOLD}[5]${NC} Custom Pilihan (Pilih kombinasi aplikasi manual)"
 echo ""
 
-read -r -p "Masukkan pilihan Anda [1-5]: " MENU_CHOICE
+read -r -p "Masukkan pilihan Anda [1-5]: " MENU_CHOICE < /dev/tty
 
 MIGRATE_AWAN=false
 MIGRATE_WARUNG=false
@@ -83,13 +75,13 @@ case "$MENU_CHOICE" in
     5)
         echo ""
         echo -e "${YELLOW}Tentukan aplikasi yang ingin dimigrasikan (y/n):${NC}"
-        read -r -p "Pindahkan AwanPulsa? (y/n) [y]: " ASK_AWAN
+        read -r -p "Pindahkan AwanPulsa? (y/n) [y]: " ASK_AWAN < /dev/tty
         [[ "${ASK_AWAN:-y}" =~ ^[Yy]$ ]] && MIGRATE_AWAN=true
 
-        read -r -p "Pindahkan WarungPulsa? (y/n) [y]: " ASK_WARUNG
+        read -r -p "Pindahkan WarungPulsa? (y/n) [y]: " ASK_WARUNG < /dev/tty
         [[ "${ASK_WARUNG:-y}" =~ ^[Yy]$ ]] && MIGRATE_WARUNG=true
 
-        read -r -p "Pindahkan Pasar-Desa? (y/n) [y]: " ASK_PASAR
+        read -r -p "Pindahkan Pasar-Desa? (y/n) [y]: " ASK_PASAR < /dev/tty
         [[ "${ASK_PASAR:-y}" =~ ^[Yy]$ ]] && MIGRATE_PASAR=true
         ;;
     *)
@@ -115,10 +107,10 @@ echo -e "${CYAN}----------------------------------------------------------------
 echo -e "${YELLOW}Masukkan Informasi Akses SSH VPS Lama Anda:${NC}"
 echo -e "${CYAN}--------------------------------------------------------------------------------${NC}"
 
-read -r -p "IP VPS Lama               : " OLD_IP
+read -r -p "IP VPS Lama               : " OLD_IP < /dev/tty
 while [ -z "$OLD_IP" ]; do
     echo -e "${RED}IP VPS Lama tidak boleh kosong!${NC}"
-    read -r -p "IP VPS Lama               : " OLD_IP
+    read -r -p "IP VPS Lama               : " OLD_IP < /dev/tty
 done
 
 # Validasi Anti-Human-Error: Jangan sampai script dijalankan di VPS Lama itu sendiri
@@ -139,17 +131,17 @@ for CHECK_IP in $LOCAL_IPS $PUBLIC_IP 127.0.0.1 localhost ::1; do
     fi
 done
 
-read -r -p "Port SSH VPS Lama [22]    : " OLD_PORT
+read -r -p "Port SSH VPS Lama [22]    : " OLD_PORT < /dev/tty
 OLD_PORT="${OLD_PORT:-22}"
 
-read -r -p "Username SSH [root]       : " OLD_USER
+read -r -p "Username SSH [root]       : " OLD_USER < /dev/tty
 OLD_USER="${OLD_USER:-root}"
 
-read -r -s -p "Password SSH VPS Lama     : " OLD_PASS
+read -r -s -p "Password SSH VPS Lama     : " OLD_PASS < /dev/tty
 echo ""
 while [ -z "$OLD_PASS" ]; do
     echo -e "${RED}Password SSH tidak boleh kosong!${NC}"
-    read -r -s -p "Password SSH VPS Lama     : " OLD_PASS
+    read -r -s -p "Password SSH VPS Lama     : " OLD_PASS < /dev/tty
     echo ""
 done
 
