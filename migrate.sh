@@ -223,22 +223,23 @@ apt-get install -y ufw nginx certbot python3-certbot-nginx build-essential sqlit
     apt-get install -y ufw nginx certbot python3-certbot-nginx build-essential sqlite3 ca-certificates gnupg >/dev/null 2>&1 || true
 }
 
-# Pastikan Node.js 22 LTS terpasang
-NODE_VER=$(node -v 2>/dev/null || echo "none")
-if [[ "$NODE_VER" != v22* && "$NODE_VER" != v20* && "$NODE_VER" != v24* ]]; then
-    echo -e "${CYAN}   Mengunduh & memasang Node.js 22 LTS via NodeSource...${NC}"
-    curl -fsSL https://deb.nodesource.com/setup_22.x | bash - >/dev/null 2>&1 || true
+# Pastikan Node.js & NPM terpasang
+if ! command -v node &> /dev/null || ! command -v npm &> /dev/null; then
+    echo -e "${CYAN}   Mengunduh & memasang Node.js 22 LTS & NPM...${NC}"
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash - || true
     wait_for_apt
-    apt-get install -y nodejs >/dev/null 2>&1 || apt-get install -y nodejs
+    apt-get install -y nodejs npm || apt-get install -y nodejs
 fi
-echo -e "${GREEN}   Node.js: $(node -v 2>/dev/null || echo 'terpasang') | NPM: $(npm -v 2>/dev/null || echo 'terpasang')${NC}"
+echo -e "${GREEN}   Node.js: $(node -v 2>/dev/null || echo 'gagal') | NPM: $(npm -v 2>/dev/null || echo 'gagal')${NC}"
 
 # Pastikan PM2 terpasang
 if ! command -v pm2 &> /dev/null; then
     echo -e "${CYAN}   Menginstal PM2 Process Manager secara global...${NC}"
-    npm install -g pm2 >/dev/null 2>&1 || npm install -g pm2
+    npm install -g pm2 || npm install -g pm2 --force
+    hash -r 2>/dev/null || true
+    [ -f /usr/local/bin/pm2 ] && [ ! -f /usr/bin/pm2 ] && ln -sf /usr/local/bin/pm2 /usr/bin/pm2
 fi
-echo -e "${GREEN}   PM2: $(pm2 -v 2>/dev/null || echo 'terpasang')${NC}"
+echo -e "${GREEN}   PM2: $(pm2 -v 2>/dev/null || echo 'tidak terdeteksi')${NC}"
 
 mkdir -p /var/www
 
