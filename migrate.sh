@@ -424,7 +424,7 @@ echo -e "${CYAN}================================================================
 cat << EOF
 1. 🌐 UPDATE DNS / CLOUDFLARE:
    Ubah A-Record domain Anda ke IP VPS Baru:
-   -> IP VPS BARU : ${BOLD}${NEW_IP}${NC}
+   -> IP VPS BARU : ${NEW_IP}
 
 2. ⚡ WHITELIST IP TOKO GORONTALO (Khusus AwanPulsa / WarungPulsa):
    Segera kirim pesan ke Admin/CS Toko Gorontalo:
